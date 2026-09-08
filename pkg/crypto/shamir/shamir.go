@@ -5,11 +5,13 @@ import (
 	"errors"
 )
 
+// Share represents a single share of a secret
 type Share struct {
 	ID    byte
 	Value []byte
 }
 
+// Split splits a secret into 'n' shares, requiring 'threshold' shares to reconstruct
 func Split(secret []byte, n, threshold int) ([]Share, error) {
 	if threshold < 2 {
 		return nil, errors.New("threshold must be at least 2")
