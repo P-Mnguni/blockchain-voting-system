@@ -101,7 +101,7 @@ func NewBlindSignatureIssuer(bits int) (*BlindSignatureIssuer, error) {
 }
 
 // IssueCredential issues a blind signature for a voter's identity
-func (issuer *BlindSignatureIssuer) IssuerCredential(voterID []byte) ([]byte, error) {
+func (issuer *BlindSignatureIssuer) IssueCredential(voterID []byte) ([]byte, error) {
 	// hash := sha256.Sum256(voterID)
 	// m := new(big.Int).SetBytes(hash[:])
 
