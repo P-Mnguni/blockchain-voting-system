@@ -4,6 +4,7 @@
         "ciphertexts",
         "coeffs",
         "elgamal",
+        "Homomorphic",
         "homomorphically",
         "Unblind",
         "unblinded",

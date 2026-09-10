@@ -37,6 +37,7 @@ func NewElGamal(bits int) (*PrivateKey, error) {
 	if err != nil {
 		return nil, err
 	}
+	x.Add(x, big.NewInt(1))
 
 	y := new(big.Int).Exp(g, x, p)
 
@@ -50,16 +51,22 @@ func NewElGamal(bits int) (*PrivateKey, error) {
 	}, nil
 }
 
+// EncodeVote converts a vote value (0 or 1, or any small int) into a group element
+func (pk *PublicKey) EncodeVote(vote int64) *big.Int {
+	return new(big.Int).Exp(pk.G, big.NewInt(vote), pk.P)
+}
+
 // Encrypt encrypts a message (0 or 1 for voting)
 func (pk *PublicKey) Encrypt(message *big.Int) (*Ciphertext, error) {
-	if message.Cmp(big.NewInt(0)) < 0 || message.Cmp(big.NewInt(1)) > 0 {
-		return nil, errors.New("message must be 0 or 1 for voting")
+	if message.Sign() <= 0 || message.Cmp(pk.P) >= 0 {
+		return nil, errors.New("message must be in [1, p-1] (encode votes as g^vote)")
 	}
 
-	r, err := rand.Int(rand.Reader, pk.P)
+	r, err := rand.Int(rand.Reader, new(big.Int).Sub(pk.P, big.NewInt(2)))
 	if err != nil {
 		return nil, err
 	}
+	r.Add(r, big.NewInt(1))
 
 	c1 := new(big.Int).Exp(pk.G, r, pk.P)
 
@@ -73,7 +80,13 @@ func (pk *PublicKey) Encrypt(message *big.Int) (*Ciphertext, error) {
 	}, nil
 }
 
-// Decrypt decrypts a ciphertext
+// EncryptVote is a convenience function that encodes and encrypts a vote
+func (pk *PublicKey) EncryptVote(vote int64) (*Ciphertext, error) {
+	m := pk.EncodeVote(vote)
+	return pk.Encrypt(m)
+}
+
+// Decrypt recovers the encoded message (g^vote mod p), NOT the vote itself
 func (sk *PrivateKey) Decrypt(ciphertext *Ciphertext) (*big.Int, error) {
 	c1X := new(big.Int).Exp(ciphertext.C1, sk.X, sk.P)
 
@@ -88,11 +101,30 @@ func (sk *PrivateKey) Decrypt(ciphertext *Ciphertext) (*big.Int, error) {
 	return message, nil
 }
 
+// DecryptVote decrypts and solves the discrete log to recover the vote sum
+func (sk *PrivateKey) DecryptVote(ciphertext *Ciphertext, maxSum int64) (int64, error) {
+	encoded, err := sk.Decrypt(ciphertext)
+	if err != nil {
+		return 0, err
+	}
+
+	current := big.NewInt(1)
+	for i := int64(0); i < maxSum; i++ {
+		if current.Cmp(encoded) == 0 {
+			return i, nil
+		}
+		current.Mul(current, sk.G)
+		current.Mod(current, sk.P)
+	}
+
+	return 0, errors.New("vote sum exceeds maxSum or decryption failed")
+}
+
 // Add homomorphically adds two ciphertexts
-func Add(c1, c2 *Ciphertext) *Ciphertext {
+func Add(c1, c2 *Ciphertext, p *big.Int) *Ciphertext {
 	return &Ciphertext{
-		C1: new(big.Int).Mul(c1.C1, c2.C1),
-		C2: new(big.Int).Mul(c1.C2, c2.C2),
+		C1: new(big.Int).Mod(new(big.Int).Mul(c1.C1, c2.C1), p),
+		C2: new(big.Int).Mod(new(big.Int).Mul(c1.C2, c2.C2), p),
 	}
 }
 
@@ -107,7 +139,7 @@ func AddMany(ciphertexts []*Ciphertext, p *big.Int) *Ciphertext {
 		C2: new(big.Int).Set(ciphertexts[0].C2),
 	}
 
-	for i := 0; i < len(ciphertexts); i++ {
+	for i := 1; i < len(ciphertexts); i++ {
 		result.C1.Mul(result.C1, ciphertexts[i].C1)
 		result.C1.Mod(result.C1, p)
 		result.C2.Mul(result.C2, ciphertexts[i].C2)
@@ -118,17 +150,10 @@ func AddMany(ciphertexts []*Ciphertext, p *big.Int) *Ciphertext {
 }
 
 // ScalarMul multiplies a ciphertext by a scalar (for weighted voting)
-func ScalarMul(c *Ciphertext, scalar int, p *big.Int) *Ciphertext {
+func ScalarMul(c *Ciphertext, scalar int64, p *big.Int) *Ciphertext {
 	result := &Ciphertext{
-		C1: new(big.Int).Set(c.C1),
-		C2: new(big.Int).Set(c.C2),
-	}
-
-	for i := 1; i < scalar; i++ {
-		result.C1.Mul(result.C1, c.C1)
-		result.C1.Mod(result.C1, p)
-		result.C2.Mul(result.C2, c.C2)
-		result.C2.Mod(result.C2, p)
+		C1: new(big.Int).Exp(c.C1, big.NewInt(scalar), p),
+		C2: new(big.Int).Exp(c.C2, big.NewInt(scalar), p),
 	}
 
 	return result
