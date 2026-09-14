@@ -47,6 +47,7 @@ func VerifyDecryptionProof(C1, C2, m, y, p, g *big.Int, proof *DecryptionProof) 
 	gS := new(big.Int).Exp(g, proof.Response, p)
 	yChallenge := new(big.Int).Exp(y, proof.Challenge, p)
 	left := new(big.Int).Mul(gS, yChallenge)
+	left.Mod(left, p)
 
 	if left.Cmp(proof.Commitment) != 0 {
 		return false
