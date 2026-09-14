@@ -3,6 +3,7 @@ package zkproofs
 import (
 	"crypto/rand"
 	"crypto/sha256"
+	"errors"
 	"math/big"
 )
 
@@ -10,89 +11,120 @@ import (
 // without revealing the decryption key or the plaintext
 
 type DecryptionProof struct {
-	Commitment *big.Int
-	Challenge  *big.Int
-	Response   *big.Int
+	A *big.Int
+	B *big.Int
+	S *big.Int
 }
 
 // GenerateDecryptionProof generates a zero-knowledge proof of correct decryption
-func GenerateDecryptionProof(C1, C2, m, y, p, g *big.Int, x *big.Int) (*DecryptionProof, error) {
-	r, err := rand.Int(rand.Reader, p)
+func GenerateDecryptionProof(C1, C2, m, y, p, g, x *big.Int) (*DecryptionProof, error) {
+	if m.Sign() == 0 {
+		return nil, errors.New("m must be nonzero")
+	}
+
+	mInv := new(big.Int).ModInverse(m, p)
+	if mInv == nil {
+		return nil, errors.New("m not invertible mod p")
+	}
+
+	c2OverM := new(big.Int).Mul(C2, mInv)
+	c2OverM.Mod(c2OverM, p)
+
+	pm1 := new(big.Int).Sub(p, big.NewInt(1))
+	r, err := rand.Int(rand.Reader, pm1)
 	if err != nil {
 		return nil, err
 	}
 
-	t := new(big.Int).Exp(g, r, p)
+	A := new(big.Int).Exp(g, r, p)
+	B := new(big.Int).Exp(C1, r, p)
 
-	hash := sha256.Sum256(append(
-		append(C1.Bytes(), C2.Bytes()...),
-		append(m.Bytes(), t.Bytes()...)...,
-	))
-	challenge := new(big.Int).SetBytes(hash[:])
-	challenge.Mod(challenge, p)
+	c := hashToChallenge(p, g, y, C1, c2OverM, A, B)
 
-	challengeX := new(big.Int).Mul(challenge, x)
-	response := new(big.Int).Sub(r, challengeX)
-	response.Mod(response, new(big.Int).Sub(p, big.NewInt(1)))
+	cx := new(big.Int).Mul(c, x)
+	s := new(big.Int).Add(r, cx)
+	s.Mod(s, pm1)
 
 	return &DecryptionProof{
-		Commitment: t,
-		Challenge:  challenge,
-		Response:   response,
+		A: A,
+		B: B,
+		S: s,
 	}, nil
 }
 
 // VerifyDecryptionProof verifies a proof of correct decryption
 func VerifyDecryptionProof(C1, C2, m, y, p, g *big.Int, proof *DecryptionProof) bool {
-	gS := new(big.Int).Exp(g, proof.Response, p)
-	yChallenge := new(big.Int).Exp(y, proof.Challenge, p)
-	left := new(big.Int).Mul(gS, yChallenge)
-	left.Mod(left, p)
-
-	if left.Cmp(proof.Commitment) != 0 {
+	if m.Sign() == 0 {
 		return false
 	}
 
-	c1S := new(big.Int).Exp(C1, proof.Response, p)
+	mInv := new(big.Int).ModInverse(m, p)
+	if mInv == nil {
+		return false
+	}
 
-	c2OverM := new(big.Int).Mul(C2, new(big.Int).ModInverse(m, p))
+	c2OverM := new(big.Int).Mul(C2, mInv)
 	c2OverM.Mod(c2OverM, p)
 
-	c2OverMChallenge := new(big.Int).Exp(c2OverM, proof.Challenge, p)
+	c := hashToChallenge(p, g, y, C1, c2OverM, proof.A, proof.B)
 
-	right := new(big.Int).Mul(c1S, c2OverMChallenge)
-	right.Mod(right, p)
+	pm1 := new(big.Int).Sub(p, big.NewInt(1))
 
-	return right.Cmp(proof.Commitment) == 0
+	gS := new(big.Int).Exp(g, proof.S, p)
+	yC := new(big.Int).Exp(y, c, p)
+	rhs1 := new(big.Int).Mod(new(big.Int).Mul(proof.A, yC), p)
+
+	if gS.Cmp(rhs1) != 0 {
+		return false
+	}
+
+	c1S := new(big.Int).Exp(C1, proof.S, p)
+	c2OverMC := new(big.Int).Exp(c2OverM, c, p)
+	rhs2 := new(big.Int).Mod(new(big.Int).Mul(proof.B, c2OverMC), p)
+
+	_ = pm1
+
+	return c1S.Cmp(rhs2) == 0
+}
+
+// hashToChallenge computes Fiat-Shamir challenge over all relevant values
+func hashToChallenge(p, g, y, C1, c2OverM, A, B *big.Int) *big.Int {
+	h := sha256.New()
+	for _, v := range []*big.Int{g, y, C1, c2OverM, A, B} {
+		h.Write(v.Bytes())
+	}
+	c := new(big.Int).SetBytes(h.Sum(nil))
+
+	pm1 := new(big.Int).Sub(p, big.NewInt(1))
+	return c.Mod(c, pm1)
 }
 
 // ProofOfTallyCorrectness proves that the tally was computed correctly
 type TallyProof struct {
-	DecryptionProofs []*DecryptionProof
-	SumC1            *big.Int
-	SumC2            *big.Int
+	SumC1  *big.Int
+	SumC2  *big.Int
+	Proofs []*DecryptionProof
 }
 
 // GenerateTallyProof generates proofs for all candidates in the tally
-func GenerateTallyProof(encryptedBallots []struct{ C1, C2 *big.Int },
-	results []*big.Int, publicKey *struct{ P, G, Y *big.Int }, x *big.Int) (*TallyProof, error) {
-
-	sumC1 := big.NewInt(1)
-	sumC2 := big.NewInt(1)
-
-	for _, ballot := range encryptedBallots {
-		sumC1.Mul(sumC1, ballot.C1)
-		sumC1.Mod(sumC1, publicKey.P)
-		sumC2.Mul(sumC2, ballot.C2)
-		sumC2.Mod(sumC2, publicKey.P)
+func GenerateTallyProof(
+	perCandidateCiphertexts []struct{ C1, C2 *big.Int },
+	results []*big.Int,
+	publicKey *struct{ P, G, Y *big.Int },
+	x *big.Int,
+) (*TallyProof, error) {
+	if len(perCandidateCiphertexts) != len(results) {
+		return nil, errors.New("mismatched candidates and results")
 	}
 
 	proofs := make([]*DecryptionProof, len(results))
-	for i, result := range results {
-		proof, err := GenerateDecryptionProof(
-			sumC1,
-			sumC2,
-			result,
+	for i := range results {
+		m := new(big.Int).Exp(publicKey.G, results[i], publicKey.P)
+
+		p, err := GenerateDecryptionProof(
+			perCandidateCiphertexts[i].C1,
+			perCandidateCiphertexts[i].C2,
+			m,
 			publicKey.Y,
 			publicKey.P,
 			publicKey.G,
@@ -101,30 +133,32 @@ func GenerateTallyProof(encryptedBallots []struct{ C1, C2 *big.Int },
 		if err != nil {
 			return nil, err
 		}
-		proofs[i] = proof
+		proofs[i] = p
 	}
 
-	return &TallyProof{
-		DecryptionProofs: proofs,
-		SumC1:            sumC1,
-		SumC2:            sumC2,
-	}, nil
+	return &TallyProof{Proofs: proofs}, nil
 }
 
-func VerifyTallyProof(results []*big.Int, publicKey *struct{ P, G, Y *big.Int }, proof *TallyProof) bool {
-	if len(results) != len(proof.DecryptionProofs) {
+func VerifyTallyProof(
+	perCandidateCiphertexts []struct{ C1, C2 *big.Int },
+	results []*big.Int,
+	publicKey *struct{ P, G, Y *big.Int },
+	proof *TallyProof,
+) bool {
+	if len(perCandidateCiphertexts) != len(results) || len(proof.Proofs) != len(results) {
 		return false
 	}
 
-	for i, results := range results {
+	for i := range results {
+		m := new(big.Int).Exp(publicKey.G, results[i], publicKey.P)
 		if !VerifyDecryptionProof(
-			proof.SumC1,
-			proof.SumC2,
-			results,
+			perCandidateCiphertexts[i].C1,
+			perCandidateCiphertexts[i].C2,
+			m,
 			publicKey.Y,
 			publicKey.P,
 			publicKey.G,
-			proof.DecryptionProofs[i],
+			proof.Proofs[i],
 		) {
 			return false
 		}
