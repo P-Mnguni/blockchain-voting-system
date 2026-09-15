@@ -25,9 +25,14 @@ var (
 	SplitShamir   = shamir.Split
 	CombineShamir = shamir.Combine
 
-	NewElGamal       = elgamal.NewElGamal
-	ElGamalEncrypt   = (*elgamal.PublicKey).Encrypt
-	ElGamalDecrypt   = (*elgamal.PrivateKey).Decrypt
+	NewElGamal = elgamal.NewElGamal
+
+	EncryptVote    = (*elgamal.PublicKey).EncryptVote
+	ElGamalEncrypt = (*elgamal.PublicKey).Encrypt
+
+	DecryptVote    = (*elgamal.PrivateKey).DecryptVote
+	ElGamalDecrypt = (*elgamal.PrivateKey).Decrypt
+
 	ElGamalAdd       = elgamal.Add
 	ElGamalAddMany   = elgamal.AddMany
 	ElGamalScalarMul = elgamal.ScalarMul
