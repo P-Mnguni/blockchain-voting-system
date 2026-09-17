@@ -11,5 +11,6 @@
         "unblinded",
         "unblinds",
         "zkproofs"
-    ]
+    ],
+    "makefile.configureOnOpen": false
 }
