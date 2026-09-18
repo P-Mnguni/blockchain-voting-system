@@ -41,7 +41,10 @@ func TestCryptoSurface(t *testing.T) {
 
 		// Homomorphic add
 		ct2, _ := sk.EncryptVote(1)
-		sum := crypto.ElGamalAddMany([]*crypto.Ciphertext{ct1, ct2, ct0}, sk.P)
+		sum, err := crypto.ElGamalAddMany([]*crypto.Ciphertext{ct1, ct2, ct0}, sk.P)
+		if err != nil {
+			t.Fatalf("AddMany failed: %v", err)
+		}
 
 		result, err := sk.DecryptVote(sum, 100)
 		if err != nil {

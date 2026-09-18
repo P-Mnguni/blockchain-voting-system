@@ -3,6 +3,7 @@ package elgamal
 import (
 	"crypto/rand"
 	"errors"
+	"fmt"
 	"math/big"
 )
 
@@ -23,6 +24,9 @@ type Ciphertext struct {
 	C1 *big.Int
 	C2 *big.Int
 }
+
+// ErrEmptyCiphertextSet is returned when AddMany is called with no ciphertexts
+var ErrEmptyCiphertextSet = errors.New("cannot add empty ciphertext set")
 
 // NewElGamal generates a new ElGamal key pair
 func NewElGamal(bits int) (*PrivateKey, error) {
@@ -82,6 +86,9 @@ func (pk *PublicKey) Encrypt(message *big.Int) (*Ciphertext, error) {
 
 // EncryptVote is a convenience function that encodes and encrypts a vote
 func (pk *PublicKey) EncryptVote(vote int64) (*Ciphertext, error) {
+	if vote < 0 {
+		return nil, errors.New("vote must be non-negative")
+	}
 	m := pk.EncodeVote(vote)
 	return pk.Encrypt(m)
 }
@@ -129,9 +136,15 @@ func Add(c1, c2 *Ciphertext, p *big.Int) *Ciphertext {
 }
 
 // AddMany homomorphically adds multiple ciphertexts
-func AddMany(ciphertexts []*Ciphertext, p *big.Int) *Ciphertext {
+func AddMany(ciphertexts []*Ciphertext, p *big.Int) (*Ciphertext, error) {
 	if len(ciphertexts) == 0 {
-		return nil
+		return nil, ErrEmptyCiphertextSet
+	}
+
+	for i, ct := range ciphertexts {
+		if ct == nil || ct.C1 == nil || ct.C2 == nil {
+			return nil, fmt.Errorf("ciphertext at index %d is nil or malformed", i)
+		}
 	}
 
 	result := &Ciphertext{
@@ -146,7 +159,7 @@ func AddMany(ciphertexts []*Ciphertext, p *big.Int) *Ciphertext {
 		result.C2.Mod(result.C2, p)
 	}
 
-	return result
+	return result, nil
 }
 
 // ScalarMul multiplies a ciphertext by a scalar (for weighted voting)

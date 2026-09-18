@@ -56,7 +56,10 @@ func TestHomomorphicAddition(t *testing.T) {
 		ciphertexts[i] = ct
 	}
 
-	result := AddMany(ciphertexts, sk.P)
+	result, err := AddMany(ciphertexts, sk.P)
+	if err != nil {
+		t.Fatalf("AddMany failed: %v", err)
+	}
 
 	decrypted, err := sk.DecryptVote(result, 100)
 	if err != nil {
@@ -95,7 +98,11 @@ func TestHomomorphicAdditionLargeVote(t *testing.T) {
 		ciphertexts[i] = ct
 	}
 
-	result := AddMany(ciphertexts, sk.P)
+	result, err := AddMany(ciphertexts, sk.P)
+	if err != nil {
+		t.Fatalf("AddMany failed: %v", err)
+	}
+
 	decrypted, err := sk.DecryptVote(result, 2000)
 	if err != nil {
 		t.Fatalf("DecryptVote failed: %v", err)
