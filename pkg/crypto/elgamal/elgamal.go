@@ -110,13 +110,21 @@ func (sk *PrivateKey) Decrypt(ciphertext *Ciphertext) (*big.Int, error) {
 
 // DecryptVote decrypts and solves the discrete log to recover the vote sum
 func (sk *PrivateKey) DecryptVote(ciphertext *Ciphertext, maxSum int64) (int64, error) {
+	if maxSum < 0 {
+		return 0, errors.New("maxSum must be non-negative")
+	}
+
 	encoded, err := sk.Decrypt(ciphertext)
 	if err != nil {
 		return 0, err
 	}
 
-	current := big.NewInt(1)
-	for i := int64(0); i < maxSum; i++ {
+	if encoded.Cmp(big.NewInt(1)) == 0 {
+		return 0, nil
+	}
+
+	current := new(big.Int).Set(sk.G)
+	for i := int64(1); i <= maxSum; i++ {
 		if current.Cmp(encoded) == 0 {
 			return i, nil
 		}
@@ -124,7 +132,25 @@ func (sk *PrivateKey) DecryptVote(ciphertext *Ciphertext, maxSum int64) (int64, 
 		current.Mod(current, sk.P)
 	}
 
-	return 0, errors.New("vote sum exceeds maxSum or decryption failed")
+	return 0, fmt.Errorf(
+		"DecryptVote: discrete log not found in [0, %d] (encoded=%s)",
+		maxSum, truncateHex(encoded, 16),
+	)
+}
+
+// truncateHex renders the first n bytes of a big.Int in hex for diagnostics
+func truncateHex(n *big.Int, nBytes int) string {
+	if n == nil {
+		return "<nil>"
+	}
+	b := n.Bytes()
+	if len(b) == 0 {
+		return "0x0"
+	}
+	if len(b) <= nBytes {
+		return fmt.Sprintf("0x%x", b)
+	}
+	return fmt.Sprintf("0x%x...(%d bytes total)", b[:nBytes], len(b))
 }
 
 // Add homomorphically adds two ciphertexts

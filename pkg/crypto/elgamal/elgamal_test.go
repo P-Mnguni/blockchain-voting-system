@@ -167,6 +167,55 @@ func TestEncryptRejectsZero(t *testing.T) {
 	}
 }
 
+func TestDecryptVoteDiagnostic(t *testing.T) {
+	sk, err := NewElGamal(2048)
+	if err != nil {
+		t.Fatalf("NewElGamal failed: %v", err)
+	}
+
+	t.Logf("g = %s", sk.G.Text(16))
+	t.Logf("p bit length = %d", sk.P.BitLen())
+
+	for _, vote := range []int64{0, 1, 2, 3, 5, 10} {
+		ct, _ := sk.EncryptVote(vote)
+		encoded, _ := sk.Decrypt(ct)
+		expected := new(big.Int).Exp(sk.G, big.NewInt(vote), sk.P)
+		t.Logf("vote=%d: encoded=%s expected=%s match=%v",
+			vote,
+			truncateHex(encoded, 8),
+			truncateHex(expected, 8),
+			encoded.Cmp(expected) == 0,
+		)
+
+		got, err := sk.DecryptVote(ct, 100)
+		if err != nil {
+			t.Errorf("vote=%d: DecryptVote err=%v", vote, err)
+		} else if got != vote {
+			t.Errorf("vote=%d: DecryptVote got %d", vote, got)
+		}
+	}
+
+	ciphertexts := make([]*Ciphertext, 100)
+	for i := range ciphertexts {
+		ciphertexts[i], _ = sk.EncryptVote(1)
+	}
+	sum, err := AddMany(ciphertexts, sk.P)
+	if err != nil {
+		t.Fatalf("AddMany failed: %v", err)
+	}
+
+	encoded, _ := sk.Decrypt(sum)
+	t.Logf("sum-of-100: encoded = %s", truncateHex(encoded, 8))
+	t.Logf("sum-of-100: g^99	= %s", truncateHex(new(big.Int).Exp(sk.G, big.NewInt(99), sk.P), 8))
+	t.Logf("sum-of-100: g^100	= %s", truncateHex(new(big.Int).Exp(sk.G, big.NewInt(100), sk.P), 8))
+	t.Logf("sum-of-100: g^101	= %s", truncateHex(new(big.Int).Exp(sk.G, big.NewInt(101), sk.P), 8))
+
+	for _, bound := range []int64{99, 100, 101} {
+		got, err := sk.DecryptVote(sum, bound)
+		t.Logf("DecryptVot(sum, %d) = %d, err = %v", bound, got, err)
+	}
+}
+
 func BenchmarkEncryptVote(b *testing.B) {
 	sk, _ := NewElGamal(2048)
 	b.ResetTimer()
