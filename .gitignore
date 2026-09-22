@@ -1,0 +1,14 @@
+# Go
+*.exe
+*.test
+*.out
+coverage.out
+coverage.html
+
+# IDE
+.DS_Store
+Thumbs.db
+
+# Fabric
+deployments/fabric/crypto-config/
+deployments/fabric/channel-artifacts/
