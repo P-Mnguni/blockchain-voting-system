@@ -1,15 +1,20 @@
 {
     "cSpell.words": [
+        "chaincode",
         "Ciphertext",
         "ciphertexts",
         "coeffs",
+        "contractapi",
         "elgamal",
         "Homomorphic",
         "homomorphically",
+        "hyperledger",
         "shamir",
+        "timestamppb",
         "Unblind",
         "unblinded",
         "unblinds",
+        "unmarshals",
         "zkproofs"
     ],
     "makefile.configureOnOpen": false
