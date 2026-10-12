@@ -1,0 +1,205 @@
+# configtx.yaml
+# Input for configtxgen. Produces genesis block and channel tx.
+
+Organizations:
+  - &OrdererOrg
+    Name: OrdererOrg
+    ID: OrdererMSP
+    MSPDir: crypto-config/ordererOrganizations/electoralcommission.example.com/msp
+    Policies:
+      Readers:
+        Type: Signature
+        Rule: "OR('OrdererMSP.member')"
+      Writers:
+        Type: Signature
+        Rule: "OR('OrdererMSP.member')"
+      Admins:
+        Type: Signature
+        Rule: "OR('OrdererMSP.admin')"
+    OrdererEndpoints:
+      - orderer.electoralcommission.example.com:7050
+
+  - &ElectoralCommission
+    Name: ElectoralCommissionMSP
+    ID: ElectoralCommissionMSP
+    MSPDir: crypto-config/peerOrganizations/electoralcommission.example.com/msp
+    Policies:
+      Readers:
+        Type: Signature
+        Rule: "OR('ElectoralCommissionMSP.admin', 'ElectoralCommissionMSP.peer', 'ElectoralCommissionMSP.client')"
+      Writers:
+        Type: Signature
+        Rule: "OR('ElectoralCommissionMSP.admin', 'ElectoralCommissionMSP.client')"
+      Admins:
+        Type: Signature
+        Rule: "OR('ElectoralCommissionMSP.admin')"
+      Endorsement:
+        Type: Signature
+        Rule: "OR('ElectoralCommissionMSP.peer')"
+    AnchorPeers:
+      - Host: peer0.electoralcommission.example.com
+        Port: 7051
+
+  - &PartyA
+    Name: PartyAMSP
+    ID: PartyAMSP
+    MSPDir: crypto-config/peerOrganizations/partya.example.com/msp
+    Policies:
+      Readers:
+        Type: Signature
+        Rule: "OR('PartyAMSP.admin', 'PartyAMSP.peer', 'PartyAMSP.client')"
+      Writers:
+        Type: Signature
+        Rule: "OR('PartyAMSP.admin', 'PartyAMSP.client')"
+      Admins:
+        Type: Signature
+        Rule: "OR('PartyAMSP.admin')"
+      Endorsement:
+        Type: Signature
+        Rule: "OR('PartyAMSP.peer')"
+    AnchorPeers:
+      - Host: peer0.partya.example.com
+        Port: 8051
+
+  - &PartyB
+    Name: PartyBMSP
+    ID: PartyBMSP
+    MSPDir: crypto-config/peerOrganizations/partyb.example.com/msp
+    Policies:
+      Readers:
+        Type: Signature
+        Rule: "OR('PartyBMSP.admin', 'PartyBMSP.peer', 'PartyBMSP.client')"
+      Writers:
+        Type: Signature
+        Rule: "OR('PartyBMSP.admin', 'PartyBMSP.client')"
+      Admins:
+        Type: Signature
+        Rule: "OR('PartyBMSP.admin')"
+      Endorsement:
+        Type: Signature
+        Rule: "OR('PartyBMSP.peer')"
+    AnchorPeers:
+      - Host: peer0.partyb.example.com
+        Port: 9051
+
+  - &Judiciary
+    Name: JudiciaryMSP
+    ID: JudiciaryMSP
+    MSPDir: crypto-config/peerOrganizations/judiciary.example.com/msp
+    Policies:
+      Readers:
+        Type: Signature
+        Rule: "OR('JudiciaryMSP.admin', 'JudiciaryMSP.peer', 'JudiciaryMSP.client')"
+      Writers:
+        Type: Signature
+        Rule: "OR('JudiciaryMSP.admin', 'JudiciaryMSP.client')"
+      Admins:
+        Type: Signature
+        Rule: "OR('JudiciaryMSP.admin')"
+      Endorsement:
+        Type: Signature
+        Rule: "OR('JudiciaryMSP.peer')"
+    AnchorPeers:
+      - Host: peer0.judiciary.example.com
+        Port: 10051
+
+Capabilities:
+  Channel: &ChannelCapabilities
+    V2_0: true
+  Orderer: &OrdererCapabilities
+    V2_0: true
+  Application: &ApplicationCapabilities
+    V2_5: true
+
+Application: &ApplicationDefaults
+  Organizations:
+  Policies:
+    Readers:
+      Type: ImplicitMeta
+      Rule: "ANY Readers"
+    Writers:
+      Type: ImplicitMeta
+      Rule: "ANY Writers"
+    Admins:
+      Type: ImplicitMeta
+      Rule: "MAJORITY Admins"
+    LifecycleEndorsement:
+      Type: ImplicitMeta
+      Rule: "MAJORITY Endorsement"
+    Endorsement:
+      Type: ImplicitMeta
+      Rule: "MAJORITY Endorsement"
+  Capabilities:
+    <<: *ApplicationCapabilities
+
+Orderer: &OrdererDefaults
+  OrdererType: etcdraft
+  Addresses:
+    - orderer.electoralcommission.example.com:7050
+  EtcdRaft:
+    Consenters:
+      - Host: orderer.electoralcommission.example.com
+        Port: 7050
+        ClientTLSCert: crypto-config/ordererOrganizations/electoralcommission.example.com/orderers/orderer.electoralcommission.example.com/tls/server.crt
+        ServerTLSCert: crypto-config/ordererOrganizations/electoralcommission.example.com/orderers/orderer.electoralcommission.example.com/tls/server.crt
+  BatchTimeout: 2s
+  BatchSize:
+    MaxMessageCount: 10
+    AbsoluteMaxBytes: 99 MB
+    PreferredMaxBytes: 512 KB
+  Organizations:
+  Policies:
+    Readers:
+      Type: ImplicitMeta
+      Rule: "ANY Readers"
+    Writers:
+      Type: ImplicitMeta
+      Rule: "ANY Writers"
+    Admins:
+      Type: ImplicitMeta
+      Rule: "MAJORITY Admins"
+    BlockValidation:
+      Type: ImplicitMeta
+      Rule: "ANY Writers"
+  Capabilities:
+    <<: *OrdererCapabilities
+
+Channel: &ChannelDefaults
+  Policies:
+    Readers:
+      Type: ImplicitMeta
+      Rule: "ANY Readers"
+    Writers:
+      Type: ImplicitMeta
+      Rule: "ANY Writers"
+    Admins:
+      Type: ImplicitMeta
+      Rule: "MAJORITY Admins"
+  Capabilities:
+    <<: *ChannelCapabilities
+
+Profiles:
+  ElectionOrdererGenesis:
+    <<: *ChannelDefaults
+    Orderer:
+      <<: *OrdererDefaults
+      Organizations:
+        - *OrdererOrg
+    Consortiums:
+      ElectionConsortium:
+        Organizations:
+          - *ElectoralCommission
+          - *PartyA
+          - *PartyB
+          - *Judiciary
+
+  ElectionChannel:
+    Consortium: ElectionConsortium
+    <<: *ChannelDefaults
+    Application:
+      <<: *ApplicationDefaults
+      Organizations:
+        - *ElectoralCommission
+        - *PartyA
+        - *PartyB
+        - *Judiciary

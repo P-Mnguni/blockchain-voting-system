@@ -1,0 +1,228 @@
+# docker-compose.yml
+# Fabric 2.5 dev network: 1 orderer + 4 peers (one per org).
+#
+# Do NOT run `docker compose up` directly. Use scripts/network-up.sh,
+# which generates crypto material and starts containers in the right order.
+
+networks:
+  fabric:
+    name: fabric_dev
+
+volumes:
+  orderer_data:
+  peer_ec_data:
+  peer_party_a_data:
+  peer_party_b_data:
+  peer_judiciary_data:
+
+services:
+
+  # -------- Orderer --------
+  orderer.electoralcommission.example.com:
+    image: hyperledger/fabric-orderer:2.5.9
+    container_name: orderer.electoralcommission.example.com
+    environment:
+      - FABRIC_LOGGING_SPEC=INFO
+      - ORDERER_GENERAL_LISTENADDRESS=0.0.0.0
+      - ORDERER_GENERAL_LISTENPORT=7050
+      - ORDERER_GENERAL_LOCALMSPID=OrdererMSP
+      - ORDERER_GENERAL_LOCALMSPDIR=/var/hyperledger/orderer/msp
+      - ORDERER_GENERAL_TLS_ENABLED=true
+      - ORDERER_GENERAL_TLS_PRIVATEKEY=/var/hyperledger/orderer/tls/server.key
+      - ORDERER_GENERAL_TLS_CERTIFICATE=/var/hyperledger/orderer/tls/server.crt
+      - ORDERER_GENERAL_TLS_ROOTCAS=[/var/hyperledger/orderer/tls/ca.crt]
+      - ORDERER_GENERAL_BOOTSTRAPMETHOD=file
+      - ORDERER_GENERAL_BOOTSTRAPFILE=/var/hyperledger/orderer/orderer.genesis.block
+      - ORDERER_CHANNELPARTICIPATION_ENABLED=true
+      - ORDERER_ADMIN_TLS_ENABLED=true
+      - ORDERER_ADMIN_TLS_CERTIFICATE=/var/hyperledger/orderer/tls/server.crt
+      - ORDERER_ADMIN_TLS_PRIVATEKEY=/var/hyperledger/orderer/tls/server.key
+      - ORDERER_ADMIN_TLS_ROOTCAS=[/var/hyperledger/orderer/tls/ca.crt]
+      - ORDERER_ADMIN_TLS_CLIENTROOTCAS=[/var/hyperledger/orderer/tls/ca.crt]
+      - ORDERER_ADMIN_LISTENADDRESS=0.0.0.0:7053
+      - ORDERER_OPERATIONS_LISTENADDRESS=0.0.0.0:17050
+      - ORDERER_METRICS_PROVIDER=prometheus
+    working_dir: /root
+    command: orderer
+    volumes:
+      - ./channel-artifacts/genesis.block:/var/hyperledger/orderer/orderer.genesis.block
+      - ./crypto-config/ordererOrganizations/electoralcommission.example.com/orderers/orderer.electoralcommission.example.com/msp:/var/hyperledger/orderer/msp
+      - ./crypto-config/ordererOrganizations/electoralcommission.example.com/orderers/orderer.electoralcommission.example.com/tls:/var/hyperledger/orderer/tls
+      - orderer_data:/var/hyperledger/production/orderer
+    ports:
+      - "7050:7050"
+      - "7053:7053"
+      - "17050:17050"
+    networks:
+      - fabric
+
+  # -------- Peer: Electoral Commission --------
+  peer0.electoralcommission.example.com:
+    image: hyperledger/fabric-peer:2.5.9
+    container_name: peer0.electoralcommission.example.com
+    environment:
+      - FABRIC_LOGGING_SPEC=INFO
+      - CORE_PEER_ID=peer0.electoralcommission.example.com
+      - CORE_PEER_ADDRESS=peer0.electoralcommission.example.com:7051
+      - CORE_PEER_LISTENADDRESS=0.0.0.0:7051
+      - CORE_PEER_CHAINCODEADDRESS=peer0.electoralcommission.example.com:7052
+      - CORE_PEER_CHAINCODELISTENADDRESS=0.0.0.0:7052
+      - CORE_PEER_GOSSIP_BOOTSTRAP=peer0.electoralcommission.example.com:7051
+      - CORE_PEER_GOSSIP_EXTERNALENDPOINT=peer0.electoralcommission.example.com:7051
+      - CORE_PEER_LOCALMSPID=ElectoralCommissionMSP
+      - CORE_PEER_MSPCONFIGPATH=/etc/hyperledger/fabric/msp
+      - CORE_PEER_TLS_ENABLED=true
+      - CORE_PEER_TLS_CERT_FILE=/etc/hyperledger/fabric/tls/server.crt
+      - CORE_PEER_TLS_KEY_FILE=/etc/hyperledger/fabric/tls/server.key
+      - CORE_PEER_TLS_ROOTCERT_FILE=/etc/hyperledger/fabric/tls/ca.crt
+      - CORE_VM_ENDPOINT=unix:///host/var/run/docker.sock
+      - CORE_VM_DOCKER_HOSTCONFIG_NETWORKMODE=fabric_dev
+      - CORE_OPERATIONS_LISTENADDRESS=0.0.0.0:17051
+      - CORE_METRICS_PROVIDER=prometheus
+      - CORE_CHAINCODE_EXECUTETIMEOUT=300s
+    working_dir: /root
+    command: peer node start
+    volumes:
+      - /var/run/docker.sock:/host/var/run/docker.sock
+      - ./crypto-config/peerOrganizations/electoralcommission.example.com/peers/peer0.electoralcommission.example.com/msp:/etc/hyperledger/fabric/msp
+      - ./crypto-config/peerOrganizations/electoralcommission.example.com/peers/peer0.electoralcommission.example.com/tls:/etc/hyperledger/fabric/tls
+      - peer_ec_data:/var/hyperledger/production
+    ports:
+      - "7051:7051"
+      - "7052:7052"
+      - "17051:17051"
+    networks:
+      - fabric
+
+  # -------- Peer: Party A --------
+  peer0.partya.example.com:
+    image: hyperledger/fabric-peer:2.5.9
+    container_name: peer0.partya.example.com
+    environment:
+      - FABRIC_LOGGING_SPEC=INFO
+      - CORE_PEER_ID=peer0.partya.example.com
+      - CORE_PEER_ADDRESS=peer0.partya.example.com:8051
+      - CORE_PEER_LISTENADDRESS=0.0.0.0:8051
+      - CORE_PEER_CHAINCODEADDRESS=peer0.partya.example.com:8052
+      - CORE_PEER_CHAINCODELISTENADDRESS=0.0.0.0:8052
+      - CORE_PEER_GOSSIP_BOOTSTRAP=peer0.partya.example.com:8051
+      - CORE_PEER_GOSSIP_EXTERNALENDPOINT=peer0.partya.example.com:8051
+      - CORE_PEER_LOCALMSPID=PartyAMSP
+      - CORE_PEER_MSPCONFIGPATH=/etc/hyperledger/fabric/msp
+      - CORE_PEER_TLS_ENABLED=true
+      - CORE_PEER_TLS_CERT_FILE=/etc/hyperledger/fabric/tls/server.crt
+      - CORE_PEER_TLS_KEY_FILE=/etc/hyperledger/fabric/tls/server.key
+      - CORE_PEER_TLS_ROOTCERT_FILE=/etc/hyperledger/fabric/tls/ca.crt
+      - CORE_VM_ENDPOINT=unix:///host/var/run/docker.sock
+      - CORE_VM_DOCKER_HOSTCONFIG_NETWORKMODE=fabric_dev
+      - CORE_OPERATIONS_LISTENADDRESS=0.0.0.0:17052
+      - CORE_METRICS_PROVIDER=prometheus
+      - CORE_CHAINCODE_EXECUTETIMEOUT=300s
+    working_dir: /root
+    command: peer node start
+    volumes:
+      - /var/run/docker.sock:/host/var/run/docker.sock
+      - ./crypto-config/peerOrganizations/partya.example.com/peers/peer0.partya.example.com/msp:/etc/hyperledger/fabric/msp
+      - ./crypto-config/peerOrganizations/partya.example.com/peers/peer0.partya.example.com/tls:/etc/hyperledger/fabric/tls
+      - peer_party_a_data:/var/hyperledger/production
+    ports:
+      - "8051:8051"
+      - "8052:8052"
+      - "17052:17052"
+    networks:
+      - fabric
+
+  # -------- Peer: Party B --------
+  peer0.partyb.example.com:
+    image: hyperledger/fabric-peer:2.5.9
+    container_name: peer0.partyb.example.com
+    environment:
+      - FABRIC_LOGGING_SPEC=INFO
+      - CORE_PEER_ID=peer0.partyb.example.com
+      - CORE_PEER_ADDRESS=peer0.partyb.example.com:9051
+      - CORE_PEER_LISTENADDRESS=0.0.0.0:9051
+      - CORE_PEER_CHAINCODEADDRESS=peer0.partyb.example.com:9052
+      - CORE_PEER_CHAINCODELISTENADDRESS=0.0.0.0:9052
+      - CORE_PEER_GOSSIP_BOOTSTRAP=peer0.partyb.example.com:9051
+      - CORE_PEER_GOSSIP_EXTERNALENDPOINT=peer0.partyb.example.com:9051
+      - CORE_PEER_LOCALMSPID=PartyBMSP
+      - CORE_PEER_MSPCONFIGPATH=/etc/hyperledger/fabric/msp
+      - CORE_PEER_TLS_ENABLED=true
+      - CORE_PEER_TLS_CERT_FILE=/etc/hyperledger/fabric/tls/server.crt
+      - CORE_PEER_TLS_KEY_FILE=/etc/hyperledger/fabric/tls/server.key
+      - CORE_PEER_TLS_ROOTCERT_FILE=/etc/hyperledger/fabric/tls/ca.crt
+      - CORE_VM_ENDPOINT=unix:///host/var/run/docker.sock
+      - CORE_VM_DOCKER_HOSTCONFIG_NETWORKMODE=fabric_dev
+      - CORE_OPERATIONS_LISTENADDRESS=0.0.0.0:17053
+      - CORE_METRICS_PROVIDER=prometheus
+      - CORE_CHAINCODE_EXECUTETIMEOUT=300s
+    working_dir: /root
+    command: peer node start
+    volumes:
+      - /var/run/docker.sock:/host/var/run/docker.sock
+      - ./crypto-config/peerOrganizations/partyb.example.com/peers/peer0.partyb.example.com/msp:/etc/hyperledger/fabric/msp
+      - ./crypto-config/peerOrganizations/partyb.example.com/peers/peer0.partyb.example.com/tls:/etc/hyperledger/fabric/tls
+      - peer_party_b_data:/var/hyperledger/production
+    ports:
+      - "9051:9051"
+      - "9052:9052"
+      - "17053:17053"
+    networks:
+      - fabric
+
+  # -------- Peer: Judiciary --------
+  peer0.judiciary.example.com:
+    image: hyperledger/fabric-peer:2.5.9
+    container_name: peer0.judiciary.example.com
+    environment:
+      - FABRIC_LOGGING_SPEC=INFO
+      - CORE_PEER_ID=peer0.judiciary.example.com
+      - CORE_PEER_ADDRESS=peer0.judiciary.example.com:10051
+      - CORE_PEER_LISTENADDRESS=0.0.0.0:10051
+      - CORE_PEER_CHAINCODEADDRESS=peer0.judiciary.example.com:10052
+      - CORE_PEER_CHAINCODELISTENADDRESS=0.0.0.0:10052
+      - CORE_PEER_GOSSIP_BOOTSTRAP=peer0.judiciary.example.com:10051
+      - CORE_PEER_GOSSIP_EXTERNALENDPOINT=peer0.judiciary.example.com:10051
+      - CORE_PEER_LOCALMSPID=JudiciaryMSP
+      - CORE_PEER_MSPCONFIGPATH=/etc/hyperledger/fabric/msp
+      - CORE_PEER_TLS_ENABLED=true
+      - CORE_PEER_TLS_CERT_FILE=/etc/hyperledger/fabric/tls/server.crt
+      - CORE_PEER_TLS_KEY_FILE=/etc/hyperledger/fabric/tls/server.key
+      - CORE_PEER_TLS_ROOTCERT_FILE=/etc/hyperledger/fabric/tls/ca.crt
+      - CORE_VM_ENDPOINT=unix:///host/var/run/docker.sock
+      - CORE_VM_DOCKER_HOSTCONFIG_NETWORKMODE=fabric_dev
+      - CORE_OPERATIONS_LISTENADDRESS=0.0.0.0:17054
+      - CORE_METRICS_PROVIDER=prometheus
+      - CORE_CHAINCODE_EXECUTETIMEOUT=300s
+    working_dir: /root
+    command: peer node start
+    volumes:
+      - /var/run/docker.sock:/host/var/run/docker.sock
+      - ./crypto-config/peerOrganizations/judiciary.example.com/peers/peer0.judiciary.example.com/msp:/etc/hyperledger/fabric/msp
+      - ./crypto-config/peerOrganizations/judiciary.example.com/peers/peer0.judiciary.example.com/tls:/etc/hyperledger/fabric/tls
+      - peer_judiciary_data:/var/hyperledger/production
+    ports:
+      - "10051:10051"
+      - "10052:10052"
+      - "17054:17054"
+    networks:
+      - fabric
+
+  # -------- CLI (peer CLI + cryptogen + configtxgen in one container) --------
+  cli:
+    image: hyperledger/fabric-tools:2.5.9
+    container_name: fabric-cli
+    tty: true
+    stdin_open: true
+    environment:
+      - GOPATH=/opt/gopath
+      - FABRIC_LOGGING_SPEC=INFO
+    working_dir: /root
+    command: /bin/bash
+    volumes:
+      - ./crypto-config:/opt/gopath/src/github.com/hyperledger/fabric/peer/crypto
+      - ./channel-artifacts:/opt/gopath/src/github.com/hyperledger/fabric/peer/channel-artifacts
+      - "${REPO_ROOT}:/opt/gopath/src/github.com/blockchain-voting-system"
+      - /var/run/docker.sock:/host/var/run/docker.sock
+    networks:
+      - fabric

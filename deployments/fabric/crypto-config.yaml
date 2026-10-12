@@ -1,0 +1,59 @@
+# crypto-config.yaml
+# Input for cryptogen. Generates MSP and TLS material for each org.
+#
+# Run: cryptogen generate --config=crypto-config.yaml --output=crypto-config
+
+OrdererOrgs:
+  - Name: Orderer
+    Domain: electoralcommission.example.com
+    EnableNodeOUs: true
+    Specs:
+      - Hostname: orderer
+        SANS:
+          - localhost
+          - 127.0.0.1
+
+PeerOrgs:
+  - Name: ElectoralCommission
+    Domain: electoralcommission.example.com
+    EnableNodeOUs: true
+    Template:
+      Count: 1
+      SANS:
+        - localhost
+        - 127.0.0.1
+    Users:
+      Count: 1
+
+  - Name: PartyA
+    Domain: partya.example.com
+    EnableNodeOUs: true
+    Template:
+      Count: 1
+      SANS:
+        - localhost
+        - 127.0.0.1
+    Users:
+      Count: 1
+
+  - Name: PartyB
+    Domain: partyb.example.com
+    EnableNodeOUs: true
+    Template:
+      Count: 1
+      SANS:
+        - localhost
+        - 127.0.0.1
+    Users:
+      Count: 1
+
+  - Name: Judiciary
+    Domain: judiciary.example.com
+    EnableNodeOUs: true
+    Template:
+      Count: 1
+      SANS:
+        - localhost
+        - 127.0.0.1
+    Users:
+      Count: 1

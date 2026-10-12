@@ -1,0 +1,6 @@
+crypto-config/
+channel-artifacts/
+chaincode-build/
+
+*.log
+fabric-cli-history
