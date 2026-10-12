@@ -7,50 +7,50 @@ set -euo pipefail
 # --- Paths ---
 # FABRIC_ROOT is the directory containing this script's parent (deployments/fabric)
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-FABRIC_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
-REPO_ROOT="$(cd "${FABRIC_ROOT}/../.." && pwd)"
+export FABRIC_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
+export REPO_ROOT="$(cd "${FABRIC_ROOT}/../.." && pwd)"
 
 # Generated artifacts (gitignored)
-CRYPTO_CONFIG_DIR="${FABRIC_ROOT}/crypto-config"
-CHANNEL_ARTIFACTS_DIR="${FABRIC_ROOT}/channel-artifacts"
-CHAINCODE_BUILD_DIR="${FABRIC_ROOT}/chaincode-build"
+export CRYPTO_CONFIG_DIR="${FABRIC_ROOT}/crypto-config"
+export CHANNEL_ARTIFACTS_DIR="${FABRIC_ROOT}/channel-artifacts"
+export CHAINCODE_BUILD_DIR="${FABRIC_ROOT}/chaincode-build"
 
 # --- Docker images (pinned) ---
-FABRIC_VERSION="2.5.9"
-FABRIC_CA_VERSION="1.5.13"
+export FABRIC_VERSION="2.5.9"
+export FABRIC_CA_VERSION="1.5.13"
 
 # --- Network identity ---
-CHANNEL_NAME="electionchannel"
-CHAINCODE_NAME="ballot"
-CHAINCODE_VERSION="1.0"
-CHAINCODE_SEQUENCE="1"
+export CHANNEL_NAME="electionchannel"
+export CHAINCODE_NAME="ballot"
+export CHAINCODE_VERSION="1.0"
+export CHAINCODE_SEQUENCE="1"
 
 # --- Orderer ---
-ORDERER_HOST="orderer.electoralcommission.example.com"
-ORDERER_PORT="7050"
+export ORDERER_HOST="orderer.electoralcommission.example.com"
+export ORDERER_PORT="7050"
 
 # --- Peers ---
 # Each org runs one peer. Ports below match docker-compose.yml.
-PEER_EC_HOST="peer0.electoralcommission.example.com"
-PEER_EC_PORT="7051"
-PEER_PARTY_A_HOST="peer0.partya.example.com"
-PEER_PARTY_A_PORT="8051"
-PEER_PARTY_B_HOST="peer0.partyb.example.com"
-PEER_PARTY_B_PORT="9051"
-PEER_JUDICIARY_HOST="peer0.judiciary.example.com"
-PEER_JUDICIARY_PORT="10051"
+export PEER_EC_HOST="peer0.electoralcommission.example.com"
+export PEER_EC_PORT="7051"
+export PEER_PARTY_A_HOST="peer0.partya.example.com"
+export PEER_PARTY_A_PORT="8051"
+export PEER_PARTY_B_HOST="peer0.partyb.example.com"
+export PEER_PARTY_B_PORT="9051"
+export PEER_JUDICIARY_HOST="peer0.judiciary.example.com"
+export PEER_JUDICIARY_PORT="10051"
 
 # --- MSP IDs ---
-MSP_EC="ElectoralCommissionMSP"
-MSP_PARTY_A="PartyAMSP"
-MSP_PARTY_B="PartyBMSP"
-MSP_JUDICIARY="JudiciaryMSP"
+export MSP_EC="ElectoralCommissionMSP"
+export MSP_PARTY_A="PartyAMSP"
+export MSP_PARTY_B="PartyBMSP"
+export MSP_JUDICIARY="JudiciaryMSP"
 
 # --- Endorsement policy (4-of-4 for now; 3-of-4 is a one-line change) ---
-ENDORSEMENT_POLICY="AND('${MSP_EC}.peer', '${MSP_PARTY_A}.peer', '${MSP_PARTY_B}.peer', '${MSP_JUDICIARY}.peer')"
+export ENDORSEMENT_POLICY="AND('${MSP_EC}.peer', '${MSP_PARTY_A}.peer', '${MSP_PARTY_B}.peer', '${MSP_JUDICIARY}.peer')"
 
 # --- Docker Compose file ---
-COMPOSE_FILE="${FABRIC_ROOT}/docker-compose.yml"
+export COMPOSE_FILE="${FABRIC_ROOT}/docker-compose.yml"
 
 # --- Helpers ---
 log() { printf "\n\033[1;34m==>\033[0m %s\n" "$*"; }
