@@ -42,6 +42,13 @@ services:
       - ORDERER_ADMIN_LISTENADDRESS=0.0.0.0:7053
       - ORDERER_OPERATIONS_LISTENADDRESS=0.0.0.0:17050
       - ORDERER_METRICS_PROVIDER=prometheus
+      - ORDERER_GENERAL_CLUSTER_LISTENADDRESS=0.0.0.0
+      - ORDERER_GENERAL_CLUSTER_LISTENPORT=8443
+      - ORDERER_GENERAL_CLUSTER_SERVERCERTIFICATE=/var/hyperledger/orderer/tls/server.crt
+      - ORDERER_GENERAL_CLUSTER_SERVERPRIVATEKEY=/var/hyperledger/orderer/tls/server.key
+      - ORDERER_GENERAL_CLUSTER_CLIENTCERTIFICATE=/var/hyperledger/orderer/tls/server.crt
+      - ORDERER_GENERAL_CLUSTER_CLIENTPRIVATEKEY=/var/hyperledger/orderer/tls/server.key
+      - ORDERER_GENERAL_CLUSTER_ROOTCAS=[/var/hyperledger/orderer/tls/ca.crt]
     working_dir: /root
     command: orderer
     volumes:
@@ -53,6 +60,7 @@ services:
       - "7050:7050"
       - "7053:7053"
       - "17050:17050"
+      - "8443:8443"
     networks:
       - fabric
 
