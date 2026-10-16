@@ -13,7 +13,7 @@ export REPO_ROOT="$(cd "${FABRIC_ROOT}/../.." && pwd)"
 # Generated artifacts (gitignored)
 export CRYPTO_CONFIG_DIR="${FABRIC_ROOT}/crypto-config"
 export CHANNEL_ARTIFACTS_DIR="${FABRIC_ROOT}/channel-artifacts"
-export CHAINCODE_BUILD_DIR="${FABRIC_ROOT}/chaincode-build"
+export CHAINCODE_BUILD_DIR="${REPO_ROOT}/chaincode-build"
 
 # --- Docker images (pinned) ---
 export FABRIC_VERSION="2.5.9"
