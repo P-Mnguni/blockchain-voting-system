@@ -220,13 +220,12 @@ services:
   cli:
     image: hyperledger/fabric-tools:2.5.9
     container_name: fabric-cli
-    tty: true
     stdin_open: true
     environment:
       - GOPATH=/opt/gopath
       - FABRIC_LOGGING_SPEC=INFO
     working_dir: /root
-    command: /bin/bash
+    command: sleep infinity
     volumes:
       - ./crypto-config:/opt/gopath/src/github.com/hyperledger/fabric/peer/crypto
       - ./channel-artifacts:/opt/gopath/src/github.com/hyperledger/fabric/peer/channel-artifacts
