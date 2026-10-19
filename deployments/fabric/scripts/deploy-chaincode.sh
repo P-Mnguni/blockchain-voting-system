@@ -75,10 +75,16 @@ peer_cli() {
 log "Installing chaincode on all peers"
 for msp in ElectoralCommissionMSP PartyAMSP PartyBMSP JudiciaryMSP; do
     log "  → ${msp}"
-    peer_cli "$msp" \
-        "peer lifecycle chaincode install /opt/gopath/src/github.com/blockchain-voting-system/chaincode-build/${CHAINCODE_NAME}.tar.gz"
+    INSTALL_OUT="$(peer_cli "$msp" \
+        "peer lifecycle chaincode install /opt/gopath/src/github.com/blockchain-voting-system/chaincode-build/${CHAINCODE_NAME}.tar.gz" 2>&1 || true)"
+    echo "$INSTALL_OUT"
+    if echo "$INSTALL_OUT" | grep -q "already successfully installed"; then
+        log "    (already installed — skipping)"
+    elif echo "$INSTALL_OUT" | grep -q "Error"; then
+        err "Install failed for ${msp}"
+        exit 1
+    fi
 done
-
 # --- 4. Get package ID ---
 log "Resolving package ID"
 PKG_ID=""

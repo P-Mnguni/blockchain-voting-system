@@ -16,7 +16,7 @@ export CHANNEL_ARTIFACTS_DIR="${FABRIC_ROOT}/channel-artifacts"
 export CHAINCODE_BUILD_DIR="${REPO_ROOT}/chaincode-build"
 
 # --- Docker images (pinned) ---
-export FABRIC_VERSION="2.5.9"
+export FABRIC_VERSION="2.5.15"
 export FABRIC_CA_VERSION="1.5.13"
 
 # --- Network identity ---
