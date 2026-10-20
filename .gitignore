@@ -11,4 +11,5 @@ Thumbs.db
 
 # Fabric
 deployments/fabric/crypto-config/
-deployments/fabric/channel-artifacts/
+deployments/fabric/channel-artifacts/chaincode-build/
+chaincode-build/

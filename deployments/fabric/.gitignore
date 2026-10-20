@@ -3,4 +3,6 @@ channel-artifacts/
 chaincode-build/
 
 *.log
-fabric-cli-history
+fabric-cli-historychaincode-build/
+.env
+chaincode-build/
