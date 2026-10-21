@@ -35,7 +35,7 @@ func DefaultConfig() NetworkConfig {
 
 	return NetworkConfig{
 		MSPID:         "ElectoralCommissionMSP",
-		PeerEndpoint:  "localhost:7051",
+		PeerEndpoint:  "peer0.electoralcommission.example.com:7051",
 		PeerHostname:  "peer0.electoralcommission.example.com",
 		TLSCACertPath: filepath.Join(ecOrg, "peers/peer0.electoralcommission.example.com/tls/ca.crt"),
 		CertPath:      filepath.Join(userMSP, "signcerts/Admin@electoralcommission.example.com-cert.pem"),

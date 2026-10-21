@@ -236,3 +236,15 @@ services:
       - /var/run/docker.sock:/var/run/docker.sock
     networks:
       - fabric
+
+  test-runner:
+    image: golang:1.21
+    container_name: fabric-test-runner
+    working_dir: /work
+    volumes:
+      - "${REPO_ROOT}:/work"
+    environment:
+      - CGO_ENABLED=0
+    command: sleep infinity
+    networks:
+      - fabric
