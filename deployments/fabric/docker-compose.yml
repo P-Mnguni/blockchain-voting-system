@@ -78,6 +78,7 @@ services:
       - CORE_PEER_GOSSIP_BOOTSTRAP=peer0.electoralcommission.example.com:7051
       - CORE_PEER_GOSSIP_EXTERNALENDPOINT=peer0.electoralcommission.example.com:7051
       - CORE_PEER_LOCALMSPID=ElectoralCommissionMSP
+      - CORE_PEER_GATEWAY_ENABLED=true
       - CORE_PEER_MSPCONFIGPATH=/etc/hyperledger/fabric/msp
       - CORE_PEER_TLS_ENABLED=true
       - CORE_PEER_TLS_CERT_FILE=/etc/hyperledger/fabric/tls/server.crt
@@ -116,6 +117,7 @@ services:
       - CORE_PEER_GOSSIP_BOOTSTRAP=peer0.partya.example.com:8051
       - CORE_PEER_GOSSIP_EXTERNALENDPOINT=peer0.partya.example.com:8051
       - CORE_PEER_LOCALMSPID=PartyAMSP
+      - CORE_PEER_GATEWAY_ENABLED=true
       - CORE_PEER_MSPCONFIGPATH=/etc/hyperledger/fabric/msp
       - CORE_PEER_TLS_ENABLED=true
       - CORE_PEER_TLS_CERT_FILE=/etc/hyperledger/fabric/tls/server.crt
@@ -154,6 +156,7 @@ services:
       - CORE_PEER_GOSSIP_BOOTSTRAP=peer0.partyb.example.com:9051
       - CORE_PEER_GOSSIP_EXTERNALENDPOINT=peer0.partyb.example.com:9051
       - CORE_PEER_LOCALMSPID=PartyBMSP
+      - CORE_PEER_GATEWAY_ENABLED=true
       - CORE_PEER_MSPCONFIGPATH=/etc/hyperledger/fabric/msp
       - CORE_PEER_TLS_ENABLED=true
       - CORE_PEER_TLS_CERT_FILE=/etc/hyperledger/fabric/tls/server.crt
@@ -192,6 +195,7 @@ services:
       - CORE_PEER_GOSSIP_BOOTSTRAP=peer0.judiciary.example.com:10051
       - CORE_PEER_GOSSIP_EXTERNALENDPOINT=peer0.judiciary.example.com:10051
       - CORE_PEER_LOCALMSPID=JudiciaryMSP
+      - CORE_PEER_GATEWAY_ENABLED=true
       - CORE_PEER_MSPCONFIGPATH=/etc/hyperledger/fabric/msp
       - CORE_PEER_TLS_ENABLED=true
       - CORE_PEER_TLS_CERT_FILE=/etc/hyperledger/fabric/tls/server.crt
