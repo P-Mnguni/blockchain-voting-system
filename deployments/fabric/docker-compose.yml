@@ -238,7 +238,7 @@ services:
       - fabric
 
   test-runner:
-    image: golang:1.21
+    image: golang:1.27
     container_name: fabric-test-runner
     working_dir: /work
     volumes:

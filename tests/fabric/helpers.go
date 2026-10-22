@@ -82,7 +82,8 @@ func Connect(cfg NetworkConfig) (*Gateway, error) {
 	// connect via localhost.
 	creds := credentials.NewClientTLSFromCert(certPool, cfg.PeerHostname)
 
-	conn, err := grpc.NewClient(cfg.PeerEndpoint, grpc.WithTransportCredentials(creds))
+	target := "dns:///" + cfg.PeerEndpoint
+	conn, err := grpc.NewClient(target, grpc.WithTransportCredentials(creds))
 	if err != nil {
 		return nil, fmt.Errorf("grpc dial: %w", err)
 	}
