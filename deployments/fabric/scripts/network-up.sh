@@ -86,7 +86,24 @@ log "Starting containers"
 docker compose -f "${COMPOSE_FILE}" up -d
 
 log "Waiting for orderer to be ready..."
-wait_for_port localhost "${ORDERER_PORT}" 60
+# wait_for_port localhost "${ORDERER_PORT}" 60
+wait_for_orderer_ready() {
+    local timeout="${1:-60}"
+    local start
+    start=$(date +%s)
+    while true; do
+        if docker exec orderer.electoralcommission.example.com \
+            wget -q -O - --no-check-certificate \
+            https://localhost:17050/healthz 2>/dev/null | grep -q "OK"; then
+            return 0
+        fi
+        if (( $(date +%s) - start > timeout )); then
+            err "Timed out waiting for orderer to elect Raft leader"
+            return 1
+        fi
+        sleep 2
+    done
+}
 
 for pair in \
     "${PEER_EC_HOST}:${PEER_EC_PORT}" \
@@ -95,8 +112,10 @@ for pair in \
     "${PEER_JUDICIARY_HOST}:${PEER_JUDICIARY_PORT}"
 do
     host="${pair%%:*}"; port="${pair##*:}"
-    log "Waiting for ${host}:${port}..."
-    wait_for_port localhost "${port}" 60
+    # log "Waiting for ${host}:${port}..."
+    # wait_for_port localhost "${port}" 60
+    log "Waiting for orderer to be ready (Raft leader election)..."
+    wait_for_orderer_ready 90
 done
 
 # --- 4. Helper: run a peer CLI command as a given org ---
