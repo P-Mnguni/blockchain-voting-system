@@ -87,18 +87,19 @@ docker compose -f "${COMPOSE_FILE}" up -d
 
 log "Waiting for orderer to be ready..."
 # wait_for_port localhost "${ORDERER_PORT}" 60
+# Wait until the orderer's log shows it has accepted the Raft leader role.
 wait_for_orderer_ready() {
-    local timeout="${1:-60}"
+    local timeout="${1:-90}"
     local start
     start=$(date +%s)
     while true; do
-        if docker exec orderer.electoralcommission.example.com \
-            wget -q -O - --no-check-certificate \
-            https://localhost:17050/healthz 2>/dev/null | grep -q "OK"; then
+        if docker logs orderer.electoralcommission.example.com 2>&1 | \
+            grep -q "Start accepting requests as Raft leader"; then
+            log "Orderer is ready (Raft leader elected)"
             return 0
         fi
         if (( $(date +%s) - start > timeout )); then
-            err "Timed out waiting for orderer to elect Raft leader"
+            err "Timed out waiting for orderer Raft leader"
             return 1
         fi
         sleep 2
