@@ -248,3 +248,6 @@ services:
     command: sleep infinity
     networks:
       - fabric
+    extra_hosts:
+      - "peer0.electoralcommission.example.com:172.18.0.2"
+      - "orderer.electoralcommission.example.com:172.18.0.7"
