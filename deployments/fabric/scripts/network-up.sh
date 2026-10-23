@@ -164,5 +164,19 @@ for msp in ElectoralCommissionMSP PartyAMSP PartyBMSP JudiciaryMSP; do
             -b /opt/gopath/src/github.com/hyperledger/fabric/peer/channel-artifacts/${CHANNEL_NAME}.block"
 done
 
+# --- 6b. Apply anchor peer updates ---
+log "Applying anchor peer updates"
+for msp in ElectoralCommissionMSP PartyAMSP PartyBMSP JudiciaryMSP; do
+    log "  → ${msp}"
+    peer_cli "$msp" \
+        "peer channel update \
+            -o ${ORDERER_HOST}:${ORDERER_PORT} \
+            --ordererTLSHostnameOverride ${ORDERER_HOST} \
+            -c ${CHANNEL_NAME} \
+            -f /opt/gopath/src/github.com/hyperledger/fabric/peer/channel-artifacts/${msp}anchors.tx \
+            --tls \
+            --cafile /opt/gopath/src/github.com/hyperledger/fabric/peer/crypto/ordererOrganizations/electoralcommission.example.com/orderers/${ORDERER_HOST}/msp/tlscacerts/tlsca.electoralcommission.example.com-cert.pem"
+done
+
 log "Network is up. Channel: ${CHANNEL_NAME}"
 log "Next: ./scripts/deploy-chaincode.sh"
