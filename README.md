@@ -5,7 +5,8 @@ built on Hyperledger Fabric with end-to-end cryptographic verifiability.
 
 This repository is being built incrementally.
 **Milestone 1 (cryptographic foundation) is complete.
-**Milestone 2 (Fabric chaincode) is next.
+**Milestone 2 (Fabric chaincode) is complete.
+**Milestone 3 (Identity & Casting Services) is in progress.
 
 ---
 
@@ -51,28 +52,6 @@ It is the minimal, standard proof that a ciphertext decrypts to a claimed plaint
 to a claimed plaintext under a claimed public key. It produces a single challenge per proof, 
 is non-interactive via Fiat-Shamir, and requires only two group exponentiation checks to verify.
 
-### Testing
-
-```bash
-# Run everything
-make test
-
-# Verbose
-make test -v
-
-# Coverage report (HTML)
-make coverage
-
-# Benchmarks
-make bench
-
-# Race detector
-make race
-
-# Full quality gate (vet + race)
-make quality
-```
-
 ### Layout
 
 ```
@@ -86,13 +65,146 @@ test/integration/
 |-- crypto_test.go                  # Integration test across all primitives
 ```
 
+---
+
+## Milestone 2 — Fabric Chaincode & Dev Network ✅
+
+A working 4-organization Hyperledger Fabric 2.5.15 network with a ballot
+chaincode that enforces election lifecycle, double-spend prevention, and
+homomorphic tallying — all validated end-to-end by integration tests.
+
+### What's Included
+
+#### Ballot Chaincode — `chaincode/ballot/`
+Six contract functions implementing the election lifecycle:
+
+| Function | Purpose |
+|----------|---------|
+| `RegisterElection` | Create an election with candidates and homomorphic public key |
+| `StartVoting` | Transition REGISTRATION → VOTING |
+| `SubmitBallot` | Cast an encrypted ballot with a spent-token check |
+| `GetBallot` | Read a single encrypted ballot |
+| `HasTokenBeenSpent` | Double-vote prevention check |
+| `FreezeElection` | Transition VOTING → FROZEN |
+| `GetEncryptedTally` | Homomorphic sum over all ballots |
+
+The chaincode **never decrypts anything** — it only multiplies ciphertexts,
+which limits what a compromised or buggy contract can do.
+
+#### 4-Org Dev Network — `deployments/fabric/`
+
+| Org | Role | Peer |
+|-----|------|------|
+| Electoral Commission | Chain admin, orderer | `peer0.electoralcommission.example.com:7051` |
+| Party A | Observer | `peer0.partya.example.com:8051` |
+| Party B | Observer | `peer0.partyb.example.com:9051` |
+| Judiciary | Independent audit | `peer0.judiciary.example.com:10051` |
+
+- **Channel:** `electionchannel`
+- **Endorsement policy:** MAJORITY (3-of-4 orgs)
+- **Consensus:** Raft (single node, dev only)
+- **Anchor peers:** configured via `configtxlator` config updates (see gotchas)
+
+#### Integration Tests — `test/fabric/`
+Five tests exercising the chaincode against the live network via the
+Fabric Gateway SDK:
+
+| Test | Proves |
+|------|--------|
+| `TestHealthCheck` | Gateway → peer → orderer → commit pipeline |
+| `TestFullElectionFlow` | Register → start → 10 ballots → freeze → tally |
+| `TestDoubleSpendRejected` | Chaincode rejects reused tokens |
+| `TestSubmitAfterFreezeRejected` | Chaincode rejects post-freeze ballots |
+| `TestSubmitBeforeVotingRejected` | Chaincode rejects ballots in REGISTRATION |
+
+### Running Milestone 2
+
+```bash
+# Bring up the network (generates crypto, creates channel, joins peers)
+cd deployments/fabric
+./scripts/network-up.sh
+
+# Deploy the chaincode (package, install, approve, commit)
+./scripts/deploy-chaincode.sh
+
+# Run the integration tests (from inside the test-runner container)
+docker exec -it fabric-test-runner bash
+cd /work
+FABRIC_INTEGRATION=1 go test ./test/fabric/... -v -count=1
+```
+
+### Gotchas
+
+See deployments/fabric/README.md for a "Gotchas & Lessons Learned" section
+covering the non-obvious issues we hit during Milestone 2:
+
+- configtxgen -outputAnchorPeersUpdate is deprecated and unusable for
+existing channels — use configtxlator instead
+- extra_hosts hardcodes IPs that change on network recreation — rely on 
+Docker's embedded DNS
+- Fabric ≤2.5.9 has a broken Docker client with Docker Engine 29 — use 2.5.15+
+- Orderer health checks must match container capabilities (no wget/curl)
+- grpc.NewClient needs an explicit resolver scheme (passthrough:///)
+
+## Layout
+
+chaincode/ballot/                # Chaincode (own Go module)
+├── main.go
+├── ballot.go
+├── models.go
+├── ballot_test.go              # 13 unit tests via mock stub
+└── mock/stub.go
+
+deployments/fabric/              # Dev network
+├── docker-compose.yml           # 1 orderer, 4 peers, CLI, test-runner
+├── configtx.yaml
+├── crypto-config.yaml
+├── scripts/
+│   ├── env.sh
+│   ├── network-up.sh
+│   ├── network-down.sh
+│   └── deploy-chaincode.sh
+└── README.md                    # Includes gotchas learned during Milestone 2
+
+test/fabric/                     # Gateway SDK integration tests
+├── gateway_test.go
+└── helpers.go
+
+## Milestone 3 — Identity & Casting Services 🚧
+
+In progress. Two HTTP services that turn the ballot chaincode into an actual
+voting system:
+
+- Identity Service — verifies a voter's eID, issues a blind-signature
+credential bound to voter + election + expiry
+- Casting Service — verifies the credential, submits the encrypted ballot
+to Fabric, returns a non-vote-revealing receipt
+- Client-side encryption means the casting service never sees plaintext votes.
+- Status: Sub-step 3A (core logic + unit tests) complete. Sub-steps 3B (HTTP
+services + integration) and 3C (client library + E2E) pending.
+
 ### Roadmap
 
 - **Milestone 1** - Cryptographic foundation (*complete*)
-- **Milestone 2** - Fabric chaincode + dev network
+- **Milestone 2** - Fabric chaincode + dev network (*complete*)
 - **Milestone 3** - Identity & casting services
 - **Milestone 4** - Tally & public verifier portal
 - **Milestone 5** - Production readiness (scale, HSM, audit)
+
+### Testing
+
+```bash
+# Crypto and package unit tests (no network needed)
+go test ./pkg/... ./test/integration/...
+
+# Chaincode unit tests
+cd chaincode/ballot && go test ./... && cd ../..
+
+# Fabric integration tests (requires running network)
+docker exec -it fabric-test-runner bash
+cd /work
+FABRIC_INTEGRATION=1 go test ./test/fabric/... -v -count=1
+```
 
 ### Status 
 
