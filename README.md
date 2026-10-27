@@ -148,12 +148,12 @@ Docker's embedded DNS
 
 ## Layout
 
-chaincode/ballot/                # Chaincode (own Go module)
-├── main.go
-├── ballot.go
-├── models.go
-├── ballot_test.go              # 13 unit tests via mock stub
-└── mock/stub.go
+graph TD
+    chaincode/ballot/ --> main.go
+    chaincode/ballot/ --> ballot.go
+    chaincode/ballot/ --> models.go
+    chaincode/ballot/ --> ballot_test.go
+    chaincode/ballot/ --> mock/stub.go
 
 deployments/fabric/              # Dev network
 ├── docker-compose.yml           # 1 orderer, 4 peers, CLI, test-runner
