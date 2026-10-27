@@ -211,7 +211,7 @@ services + integration) and 3C (client library + E2E) pending.
 
 ```bash
 # Crypto and package unit tests (no network needed)
-go test ./pkg/... ./test/integration/...
+go test ./pkg/... ./tests/integration/...
 
 # Chaincode unit tests
 cd chaincode/ballot && go test ./... && cd ../..
@@ -219,7 +219,7 @@ cd chaincode/ballot && go test ./... && cd ../..
 # Fabric integration tests (requires running network)
 docker exec -it fabric-test-runner bash
 cd /work
-FABRIC_INTEGRATION=1 go test ./test/fabric/... -v -count=1
+FABRIC_INTEGRATION=1 go test ./tests/fabric/... -v -count=1
 ```
 
 ### Status 
