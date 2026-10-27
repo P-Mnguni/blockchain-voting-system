@@ -148,26 +148,42 @@ Docker's embedded DNS
 
 ## Layout
 
-graph TD
-    chaincode/ballot/ --> main.go
-    chaincode/ballot/ --> ballot.go
-    chaincode/ballot/ --> models.go
-    chaincode/ballot/ --> ballot_test.go
-    chaincode/ballot/ --> mock/stub.go
+chaincode/ballot/                # Chaincode (own Go module)
+
+├── main.go
+
+├── ballot.go
+
+├── models.go
+
+├── ballot_test.go              # 13 unit tests via mock stub
+
+└── mock/stub.go
 
 deployments/fabric/              # Dev network
+
 ├── docker-compose.yml           # 1 orderer, 4 peers, CLI, test-runner
+
 ├── configtx.yaml
+
 ├── crypto-config.yaml
+
 ├── scripts/
+
 │   ├── env.sh
+
 │   ├── network-up.sh
+
 │   ├── network-down.sh
+
 │   └── deploy-chaincode.sh
+
 └── README.md                    # Includes gotchas learned during Milestone 2
 
 test/fabric/                     # Gateway SDK integration tests
+
 ├── gateway_test.go
+
 └── helpers.go
 
 ## Milestone 3 — Identity & Casting Services 🚧
