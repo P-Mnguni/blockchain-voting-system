@@ -4,38 +4,36 @@ import (
 	"encoding/json"
 	"log"
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/blockchain-voting-system/pkg/casting"
 )
 
-// Handler wraps casting.Service with HTTP endpoints.
-type Handler struct {
+// CastingHandler wraps casting.Service with HTTP endpoints.
+type CastingHandler struct {
 	Service *casting.Service
 }
 
-// CastRequest is the body of POST /cast.
-type CastRequest struct {
+type castRequest struct {
 	ElectionID      string `json:"electionId"`
 	EncryptedBallot string `json:"encryptedBallot"`
 	Credential      string `json:"credential"`
 }
 
-// CastResponse is the response of POST /cast.
-type CastResponse struct {
+type castResponse struct {
 	BallotID    string `json:"ballotId"`
 	TxID        string `json:"txId"`
 	CommittedAt int64  `json:"committedAt"`
 }
 
-// Cast handles POST /cast.
-func (h *Handler) Cast(w http.ResponseWriter, r *http.Request) {
+func (h *CastingHandler) Cast(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
 		writeError(w, http.StatusMethodNotAllowed, "POST only")
 		return
 	}
 
-	var req CastRequest
+	var req castRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		writeError(w, http.StatusBadRequest, "invalid JSON: "+err.Error())
 		return
@@ -51,55 +49,47 @@ func (h *Handler) Cast(w http.ResponseWriter, r *http.Request) {
 		Credential:      req.Credential,
 	})
 	if err != nil {
-		// Classify errors for better HTTP semantics
 		msg := err.Error()
-		switch {
-		case contains(msg, "expired"),
-			contains(msg, "invalid credential"),
-			contains(msg, "already used"),
-			contains(msg, "different election"):
+		if isClientError(msg) {
 			writeError(w, http.StatusForbidden, msg)
-		default:
+		} else {
 			log.Printf("[casting] Cast failed: %v", err)
 			writeError(w, http.StatusInternalServerError, "cast failed")
 		}
 		return
 	}
 
-	writeJSON(w, http.StatusOK, CastResponse{
+	writeJSON(w, http.StatusOK, castResponse{
 		BallotID:    receipt.BallotID,
 		TxID:        receipt.TxID,
 		CommittedAt: receipt.CommittedAt,
 	})
 }
 
-// Healthz handles GET /healthz.
-func (h *Handler) Healthz(w http.ResponseWriter, r *http.Request) {
+func (h *CastingHandler) Healthz(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, map[string]string{
 		"status": "ok",
 		"time":   time.Now().UTC().Format(time.RFC3339),
 	})
 }
 
-func contains(s, sub string) bool {
-	return len(s) >= len(sub) && (s == sub || len(sub) == 0 || indexOf(s, sub) >= 0)
-}
-
-func indexOf(s, sub string) int {
-	for i := 0; i+len(sub) <= len(s); i++ {
-		if s[i:i+len(sub)] == sub {
-			return i
+// isClientError decides whether an error should map to 4xx (client's fault)
+// or 5xx (server's fault).
+func isClientError(msg string) bool {
+	for _, s := range []string{
+		"expired",
+		"invalid credential",
+		"already used",
+		"different election",
+		"required",
+		"malformed",
+		"bad payload",
+		"bad signature",
+		"wrong payload",
+	} {
+		if strings.Contains(msg, s) {
+			return true
 		}
 	}
-	return -1
-}
-
-func writeJSON(w http.ResponseWriter, code int, v interface{}) {
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(code)
-	_ = json.NewEncoder(w).Encode(v)
-}
-
-func writeError(w http.ResponseWriter, code int, msg string) {
-	writeJSON(w, code, map[string]string{"error": msg})
+	return false
 }

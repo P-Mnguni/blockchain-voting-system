@@ -10,31 +10,28 @@ import (
 	"github.com/blockchain-voting-system/pkg/identity"
 )
 
-// Handler wraps identity.Service with HTTP endpoints.
-type Handler struct {
+// IdentityHandler wraps identity.Service with HTTP endpoints.
+type IdentityHandler struct {
 	Service *identity.Service
 }
 
-// RegisterRequest is the body of POST /register.
-type RegisterRequest struct {
+type registerRequest struct {
 	VoterID    string `json:"voterId"`
 	ElectionID string `json:"electionId"`
 }
 
-// RegisterResponse is the response of POST /register.
-type RegisterResponse struct {
+type registerResponse struct {
 	Credential string `json:"credential"`
 	Expiry     int64  `json:"expiry"`
 }
 
-// Register handles POST /register.
-func (h *Handler) Register(w http.ResponseWriter, r *http.Request) {
+func (h *IdentityHandler) Register(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
 		writeError(w, http.StatusMethodNotAllowed, "POST only")
 		return
 	}
 
-	var req RegisterRequest
+	var req registerRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		writeError(w, http.StatusBadRequest, "invalid JSON: "+err.Error())
 		return
@@ -50,32 +47,21 @@ func (h *Handler) Register(w http.ResponseWriter, r *http.Request) {
 		case errors.As(err, &areErr):
 			writeError(w, http.StatusConflict, areErr.Error())
 		default:
-			log.Printf("[identity] Register(%s, %s) failed: %v", req.VoterID, req.ElectionID, err)
+			log.Printf("[identity] Register failed: %v", err)
 			writeError(w, http.StatusInternalServerError, "registration failed")
 		}
 		return
 	}
 
-	writeJSON(w, http.StatusOK, RegisterResponse{
+	writeJSON(w, http.StatusOK, registerResponse{
 		Credential: resp.Credential.Encode(),
 		Expiry:     resp.Credential.Expiry.Unix(),
 	})
 }
 
-// Healthz handles GET /healthz.
-func (h *Handler) Healthz(w http.ResponseWriter, r *http.Request) {
+func (h *IdentityHandler) Healthz(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, map[string]string{
 		"status": "ok",
 		"time":   time.Now().UTC().Format(time.RFC3339),
 	})
-}
-
-func writeJSON(w http.ResponseWriter, code int, v interface{}) {
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(code)
-	_ = json.NewEncoder(w).Encode(v)
-}
-
-func writeError(w http.ResponseWriter, code int, msg string) {
-	writeJSON(w, code, map[string]string{"error": msg})
 }
