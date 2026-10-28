@@ -248,3 +248,30 @@ services:
     command: sleep infinity
     networks:
       - fabric
+
+  voting-service:
+    build:
+      context: ${REPO_ROOT}
+      dockerfile: deployments/fabric/Dockerfile.service
+    image: blockchain-voting-system-voting:latest
+    container_name: voting-service
+    environment:
+      - IDENTITY_PORT=8080
+      - CASTING_PORT=8081
+      - ELECTION_ID=${ELECTION_ID:-election-2025}
+      - CREDENTIAL_TTL=24h
+      - FABRIC_MSP_ID=ElectoralCommissionMSP
+      - FABRIC_ENDPOINT=peer0.electoralcommission.example.com:7051
+      - FABRIC_HOSTNAME=peer0.electoralcommission.example.com
+      - FABRIC_TLS_CA=/crypto/peerOrganizations/electoralcommission.example.com/peers/peer0.electoralcommission.example.com/tls/ca.crt
+      - FABRIC_CERT=/crypto/peerOrganizations/electoralcommission.example.com/users/Admin@electoralcommission.example.com/msp/signcerts/Admin@electoralcommission.example.com-cert.pem
+      - FABRIC_KEY=/crypto/peerOrganizations/electoralcommission.example.com/users/Admin@electoralcommission.example.com/msp/keystore/priv_sk
+      - FABRIC_CHANNEL=electionchannel
+      - FABRIC_CHAINCODE=ballot
+    volumes:
+      - ./crypto-config:/crypto:ro
+    ports:
+      - "8080:8080"
+      - "8081:8081"
+    networks:
+      - fabric
