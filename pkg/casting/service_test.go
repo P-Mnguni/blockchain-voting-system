@@ -179,6 +179,7 @@ func TestCastPropagatesFabricErrors(t *testing.T) {
 	cred := makeCredential(t, issuer, "election-2025", "voter-001")
 
 	_, err := s.Cast(CastRequest{
+		ElectionID:      "election-2025",
 		EncryptedBallot: `{"C1":"1","C2":"2"}`,
 		Credential:      cred,
 	})
