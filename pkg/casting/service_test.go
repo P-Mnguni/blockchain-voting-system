@@ -2,6 +2,7 @@ package casting
 
 import (
 	"errors"
+	"strings"
 	"testing"
 	"time"
 
@@ -34,9 +35,8 @@ func newTestSetup(t *testing.T) (*Service, *blind.BlindSignatureIssuer) {
 	}
 
 	return &Service{
-		Fabric:     mock,
-		Issuer:     issuer,
-		ElectionID: "election-2025",
+		Fabric: mock,
+		Issuer: issuer,
 	}, issuer
 }
 
@@ -61,6 +61,7 @@ func TestCastSuccess(t *testing.T) {
 	cred := makeCredential(t, issuer, "election-2025", "voter-001")
 
 	receipt, err := s.Cast(CastRequest{
+		ElectionID:      "election-2025",
 		EncryptedBallot: `{"C1":"123","C2":"456"}`,
 		Credential:      cred,
 	})
@@ -183,5 +184,20 @@ func TestCastPropagatesFabricErrors(t *testing.T) {
 	})
 	if !errors.Is(err, sentinel) {
 		t.Errorf("expected sentinel, got %v", err)
+	}
+}
+
+func TestCastRejectsMismatchedElection(t *testing.T) {
+	s, issuer := newTestSetup(t)
+	cred := makeCredential(t, issuer, "election-2025", "voter-001")
+
+	// Credential is for election-2025, but request asks for election-OTHER
+	_, err := s.Cast(CastRequest{
+		ElectionID:      "election-OTHER",
+		EncryptedBallot: `{"C1":"1","C2":"2"}`,
+		Credential:      cred,
+	})
+	if err == nil || !strings.Contains(err.Error(), "different election") {
+		t.Fatalf("expected election mismatch error, got %v", err)
 	}
 }

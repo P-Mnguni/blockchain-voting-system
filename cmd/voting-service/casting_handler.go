@@ -39,12 +39,8 @@ func (h *CastingHandler) Cast(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if req.ElectionID != "" && req.ElectionID != h.Service.ElectionID {
-		writeError(w, http.StatusBadRequest, "election ID mismatch")
-		return
-	}
-
 	receipt, err := h.Service.Cast(casting.CastRequest{
+		ElectionID:      req.ElectionID,
 		EncryptedBallot: req.EncryptedBallot,
 		Credential:      req.Credential,
 	})

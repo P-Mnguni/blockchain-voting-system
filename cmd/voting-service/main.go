@@ -65,9 +65,8 @@ func run() error {
 		CredentialTTL: cfg.CredentialTTL,
 	}
 	castingSvc := &casting.Service{
-		Fabric:     fab,
-		Issuer:     issuer,
-		ElectionID: cfg.ElectionID,
+		Fabric: fab,
+		Issuer: issuer,
 	}
 
 	// HTTP handlers
