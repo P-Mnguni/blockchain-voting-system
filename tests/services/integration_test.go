@@ -27,9 +27,38 @@ type castResp struct {
 	CommittedAt int64  `json:"committedAt"`
 }
 
+// setup provisions a fresh election and returns its ID.
+// Uses the Fabric client directly so tests aren't dependent on out-of-band setup.
+func setup(t *testing.T) (electionID string, cleanup func()) {
+	t.Helper()
+
+	cfg := FabricConfigFromEnv(t)
+	prov, err := NewProvisioner(cfg)
+	if err != nil {
+		t.Fatalf("provisioner: %v", err)
+	}
+
+	electionID = FreshElectionID()
+	if err := prov.ProvisionElection(electionID); err != nil {
+		prov.Close()
+		t.Fatalf("provision election: %v", err)
+	}
+
+	t.Logf("provisioned election: %s", electionID)
+
+	return electionID, func() {
+		prov.Close()
+	}
+}
+
+// serviceURLs returns (identityURL, castingURL) or skips.
+func serviceURLs(t *testing.T) (string, string) {
+	t.Helper()
+	return Env(t, "IDENTITY_URL"), Env(t, "CASTING_URL")
+}
+
 func TestHealthz(t *testing.T) {
-	idURL := Env(t, "IDENTITY_URL")
-	castURL := Env(t, "CASTING_URL")
+	idURL, castURL := serviceURLs(t)
 
 	id := NewHTTPClient(idURL)
 	if code, err := id.Get("/healthz"); err != nil || code != 200 {
@@ -43,10 +72,11 @@ func TestHealthz(t *testing.T) {
 }
 
 func TestRegisterAndCast(t *testing.T) {
-	idURL := Env(t, "IDENTITY_URL")
-	castURL := Env(t, "CASTING_URL")
-	electionID := Env(t, "ELECTION_ID")
-	voterID := Env(t, "TEST_VOTER_ID")
+	idURL, castURL := serviceURLs(t)
+	electionID, cleanup := setup(t)
+	defer cleanup()
+
+	voterID := "voter-001"
 
 	id := NewHTTPClient(idURL)
 	cast := NewHTTPClient(castURL)
@@ -67,7 +97,7 @@ func TestRegisterAndCast(t *testing.T) {
 		t.Fatal("register returned empty credential")
 	}
 
-	// 2. Cast a ballot
+	// 2. Cast
 	encryptedBallot, _ := json.Marshal(map[string]string{"C1": "10", "C2": "20"})
 	var receipt castResp
 	code, err = cast.PostJSON("/cast", castReq{
@@ -91,10 +121,11 @@ func TestRegisterAndCast(t *testing.T) {
 }
 
 func TestCastRejectsDuplicateCredential(t *testing.T) {
-	idURL := Env(t, "IDENTITY_URL")
-	castURL := Env(t, "CASTING_URL")
-	electionID := Env(t, "ELECTION_ID")
-	voterID := Env(t, "TEST_VOTER_ID")
+	idURL, castURL := serviceURLs(t)
+	electionID, cleanup := setup(t)
+	defer cleanup()
+
+	voterID := "voter-002" // different voter so this test's registration is independent
 
 	id := NewHTTPClient(idURL)
 	cast := NewHTTPClient(castURL)
@@ -124,8 +155,9 @@ func TestCastRejectsDuplicateCredential(t *testing.T) {
 }
 
 func TestCastRejectsGarbageCredential(t *testing.T) {
-	castURL := Env(t, "CASTING_URL")
-	electionID := Env(t, "ELECTION_ID")
+	_, castURL := serviceURLs(t)
+	electionID, cleanup := setup(t)
+	defer cleanup()
 
 	cast := NewHTTPClient(castURL)
 	encryptedBallot, _ := json.Marshal(map[string]string{"C1": "10", "C2": "20"})
@@ -141,8 +173,9 @@ func TestCastRejectsGarbageCredential(t *testing.T) {
 }
 
 func TestRegisterRejectsUnknownVoter(t *testing.T) {
-	idURL := Env(t, "IDENTITY_URL")
-	electionID := Env(t, "ELECTION_ID")
+	idURL, _ := serviceURLs(t)
+	electionID, cleanup := setup(t)
+	defer cleanup()
 
 	id := NewHTTPClient(idURL)
 	code, err := id.PostJSON("/register", registerReq{

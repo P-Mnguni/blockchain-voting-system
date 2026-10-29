@@ -9,6 +9,8 @@ import (
 	"os"
 	"testing"
 	"time"
+
+	"github.com/blockchain-voting-system/pkg/fabricclient"
 )
 
 // Env returns a required environment variable or skips the test.
@@ -64,4 +66,28 @@ func (c *HTTPClient) Get(path string) (int, error) {
 	}
 	defer resp.Body.Close()
 	return resp.StatusCode, nil
+}
+
+// FabricConfigFromEnv builds a fabricclient.Config from the same env vars the
+// voting service uses. All are optional in tests — if any are missing, the
+// caller should skip.
+func FabricConfigFromEnv(t *testing.T) fabricclient.Config {
+	t.Helper()
+	return fabricclient.Config{
+		MSPID:         Env(t, "FABRIC_MSP_ID"),
+		PeerEndpoint:  Env(t, "FABRIC_ENDPOINT"),
+		PeerHostname:  Env(t, "FABRIC_HOSTNAME"),
+		TLSCACertPath: Env(t, "FABRIC_TLS_CA"),
+		CertPath:      Env(t, "FABRIC_CERT"),
+		KeyPath:       Env(t, "FABRIC_KEY"),
+		ChannelName:   envOrDefault("FABRIC_CHANNEL", "electionchannel"),
+		ChaincodeName: envOrDefault("FABRIC_CHAINCODE", "ballot"),
+	}
+}
+
+func envOrDefault(key, def string) string {
+	if v := os.Getenv(key); v != "" {
+		return v
+	}
+	return def
 }
