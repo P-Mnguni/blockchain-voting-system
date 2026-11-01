@@ -62,3 +62,25 @@ func (p *Provisioner) Close() error {
 func FreshElectionID() string {
 	return fmt.Sprintf("svc-test-%d", time.Now().UnixNano())
 }
+
+// ProvisionElectionWithKey registers an election with a real homomorphic
+// public key (JSON-serialized) instead of a placeholder.
+func (p *Provisioner) ProvisionElectionWithKey(electionID, pubKeyJSON string) error {
+	if electionID == "" || pubKeyJSON == "" {
+		return fmt.Errorf("electionID and pubKeyJSON are required")
+	}
+
+	if _, err := p.Fabric.Submit("RegisterElection",
+		electionID,
+		"E2E Test Election",
+		`["Alice","Bob"]`,
+		pubKeyJSON,
+	); err != nil {
+		return fmt.Errorf("RegisterElection: %w", err)
+	}
+
+	if _, err := p.Fabric.Submit("StartVoting", electionID); err != nil {
+		return fmt.Errorf("StartVoting: %w", err)
+	}
+	return nil
+}

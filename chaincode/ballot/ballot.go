@@ -341,3 +341,11 @@ func HashToken(rawToken []byte) string {
 	sum := sha256.Sum256(rawToken)
 	return hex.EncodeToString(sum[:])
 }
+
+// GetElection returns an election by ID.
+func (c *BallotContract) GetElection(
+	ctx contractapi.TransactionContextInterface,
+	electionID string,
+) (*Election, error) {
+	return c.getElection(ctx, electionID)
+}
