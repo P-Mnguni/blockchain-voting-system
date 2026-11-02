@@ -244,3 +244,47 @@ Add a short "Known limitations" note at the top of `deployments/fabric/README.md
 > plaintext ledger state, and no HSM. Do not deploy this topology anywhere
 > that matters. Production hardening is Milestone 5.
 ```
+
+### 12. Resolve the chaincode package ID by label, not by position
+
+When you install v1.0 and v1.1 of a chaincode, `peer lifecycle chaincode
+queryinstalled` lists them **alphabetically** — `ballot_1.0` comes first. If
+your deploy script grabs the first `Package ID:` it sees, it will always pick
+the **older** version, even when you're trying to upgrade.
+
+**Symptom:** the upgrade completes, `querycommitted` shows the new version,
+but the running chaincode is the old code (a new function is missing).
+
+**Example bug:**
+```bash
+# WRONG — always picks ballot_1.0
+PKG_ID="$(peer lifecycle chaincode queryinstalled | grep -o 'Package ID: [^,]*' | head -n1)"
+```
+
+**Fix — match by label:**
+```bash
+EXPECTED_LABEL="${CHAINCODE_NAME}_${CHAINCODE_VERSION}"
+PKG_ID="$(peer lifecycle chaincode queryinstalled | grep -o "Package ID: [^,]*, Label: ${EXPECTED_LABEL}$" | head -n1 | sed 's/Package ID: //;s/, Label: .*//')"
+This is what we fixed in deploy-chaincode.sh after the v1.1 upgrade
+installed v1.0 code under the v1.1 label.
+```
+
+### 13. Contract struct field types affect the JSON schema
+
+If a chaincode struct field is []byte, Go's JSON marshaller serializes it
+as a byte array ([72,101,108,108,111,...]). If clients expect a string
+(e.g. for a JSON-encoded ciphertext blob), Fabric's schema validator rejects
+the response before it reaches the client with:
+
+```bash
+Error handling success response. Value did not match schema:
+    1. return.encryptedVote: Invalid type. Expected: array, given: string
+```
+
+Rule: use string for any chaincode struct field that already holds a
+JSON-encoded blob (ciphertexts, receipts, signatures). Only use []byte
+when the field is truly binary and you want Go's default array encoding.
+
+This bit us in Milestone 3: Ballot.EncryptedVote was []byte, so
+GetBallot returned a byte array while clients parsed it as a string.
+Changed to string in chaincode v1.2.

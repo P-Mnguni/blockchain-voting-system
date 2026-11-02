@@ -6,11 +6,12 @@ built on Hyperledger Fabric with end-to-end cryptographic verifiability.
 This repository is being built incrementally.
 **Milestone 1 (cryptographic foundation) is complete.
 **Milestone 2 (Fabric chaincode) is complete.
-**Milestone 3 (Identity & Casting Services) is in progress.
+**Milestone 3 (Identity & Casting Services) is complete.
+**Milestone 4 (Tally Service & Public Verifier) is in progress.
 
 ---
 
-## Milestone 1 - Cryptographic Foundation
+## Milestone 1 - Cryptographic Foundation ✅
 
 The cryptographic primitives that everything else builds on. All are 
 independently testable and have no external dependencies.
@@ -186,46 +187,157 @@ test/fabric/                     # Gateway SDK integration tests
 
 └── helpers.go
 
-## Milestone 3 — Identity & Casting Services 🚧
+## Milestone 3 — Identity & Casting Services ✅
 
-In progress. Two HTTP services that turn the ballot chaincode into an actual
-voting system:
+Two HTTP services (running in a single binary) plus a client library that
+turn the ballot chaincode into an actual voting system.
 
-- Identity Service — verifies a voter's eID, issues a blind-signature
-credential bound to voter + election + expiry
-- Casting Service — verifies the credential, submits the encrypted ballot
-to Fabric, returns a non-vote-revealing receipt
-- Client-side encryption means the casting service never sees plaintext votes.
-- Status: Sub-step 3A (core logic + unit tests) complete. Sub-steps 3B (HTTP
-services + integration) and 3C (client library + E2E) pending.
+### What's Included
 
-### Roadmap
+#### Voting Service — `cmd/voting-service/`
+Single Go binary exposing two HTTP APIs on different ports:
 
-- **Milestone 1** - Cryptographic foundation (*complete*)
-- **Milestone 2** - Fabric chaincode + dev network (*complete*)
-- **Milestone 3** - Identity & casting services
-- **Milestone 4** - Tally & public verifier portal
-- **Milestone 5** - Production readiness (scale, HSM, audit)
+| Port | Endpoint | Purpose |
+|------|----------|---------|
+| 8080 | `POST /register` | Verify voter, issue a blind-signed credential |
+| 8080 | `GET /healthz` | Liveness |
+| 8081 | `POST /cast` | Accept encrypted ballot + credential, submit to Fabric |
+| 8081 | `GET /healthz` | Liveness |
+
+The two services share one issuer key in memory. Milestone 4 splits them
+into independent processes with a proper key exchange.
+
+#### Identity Service — `pkg/identity/`
+- `Service.Register()` — verifies eID, issues a **self-verifying credential**
+  bound to `(voterID, electionID, expiry)`
+- `Credential` — encodes `base64(voterHash || electionHash || expiry) + "." +
+  hex(signature)`. No shared state needed by the casting service: it verifies
+  the blind signature against the issuer's public key.
+- `EIDProvider` — pluggable interface; `MockEID` accepts voter-001/002/003
+- `VoterStore` — interface; in-memory impl for Milestone 3
+
+#### Casting Service — `pkg/casting/`
+- `Service.Cast()` — verifies the credential signature, checks election
+  binding + expiry, queries the chaincode for double-spend, submits the
+  encrypted ballot
+- **Never sees plaintext votes** — the client encrypts before submission
+
+#### Client Library — `pkg/client/`
+- `Client.Register()` — HTTP POST to identity service
+- `Client.Cast(vote int64)` — **encrypts locally** with the election's
+  homomorphic public key, then POSTs the ciphertext
+- `SerializePublicKey` / `DeserializePublicKey` — JSON round-trip for the
+  ElGamal public key stored in `Election.HomomorphicPubKey`
+
+#### Fabric Client — `pkg/fabricclient/`
+Thin wrapper around the Fabric Gateway SDK. Extracted from the Milestone 2
+test code so both services and tests use the same client.
 
 ### Testing
 
+Two tiers:
+
+- **Unit tests** (`go test ./pkg/...`) — no network required
+- **Integration + E2E tests** (`test/services/`) — require the live network
+
+The service tests **provision their own election** via the Fabric Gateway SDK
+and generate a real ElGamal keypair. Each test uses a fresh election ID, so
+runs are isolated.
+
+### Running
+
 ```bash
-# Crypto and package unit tests (no network needed)
-go test ./pkg/... ./tests/integration/...
+# Network up
+cd deployments/fabric && ./scripts/network-up.sh
 
-# Chaincode unit tests
-cd chaincode/ballot && go test ./... && cd ../..
+# Chaincode deployed (v1.2)
+./scripts/deploy-chaincode.sh
 
-# Fabric integration tests (requires running network)
+# Voting service
+docker compose -f docker-compose.yml up -d --build voting-service
+
+# Run tests from inside the test-runner container
 docker exec -it fabric-test-runner bash
 cd /work
-FABRIC_INTEGRATION=1 go test ./tests/fabric/... -v -count=1
+
+IDENTITY_URL=http://voting-service:8080 \
+CASTING_URL=http://voting-service:8081 \
+FABRIC_MSP_ID=ElectoralCommissionMSP \
+FABRIC_ENDPOINT=peer0.electoralcommission.example.com:7051 \
+FABRIC_HOSTNAME=peer0.electoralcommission.example.com \
+FABRIC_TLS_CA=/work/deployments/fabric/crypto-config/peerOrganizations/electoralcommission.example.com/peers/peer0.electoralcommission.example.com/tls/ca.crt \
+FABRIC_CERT=/work/deployments/fabric/crypto-config/peerOrganizations/electoralcommission.example.com/users/Admin@electoralcommission.example.com/msp/signcerts/Admin@electoralcommission.example.com-cert.pem \
+FABRIC_KEY=/work/deployments/fabric/crypto-config/peerOrganizations/electoralcommission.example.com/users/Admin@electoralcommission.example.com/msp/keystore/priv_sk \
+FABRIC_CHANNEL=electionchannel \
+FABRIC_CHAINCODE=ballot \
+go test ./test/services/... -v -count=1
 ```
+
+### Design Notes
+
+*Why one binary for two services?* The identity service signs credentials
+and the casting service verifies them. Sharing the issuer key requires either
+serialization (brittle) or a shared process (simple). Milestone 4 introduces
+a proper key exchange mechanism, and the two services split then.
+
+*Why no shared token store in casting?* The credential is self-verifying
+(the blind signature proves the issuer produced it), so the casting service
+only needs the issuer's public key. The chaincode's HasTokenBeenSpent
+check provides double-spend protection. No coordination between the two
+services beyond the public key.
+
+*Why does the client encrypt?* The architecture requires that the server
+never sees plaintext votes. The client library encrypts with the election's
+homomorphic public key before sending. The casting service only handles
+ciphertext.
+
+### Layout
+
+cmd/voting-service/
+
+├── main.go
+
+├── identity_handler.go
+
+└── casting_handler.go
+
+pkg/
+
+├── identity/          # Credential issuance, eID, voter store
+
+├── casting/           # Credential verification, ballot submission
+
+├── client/            # Go client with client-side encryption
+
+├── fabricclient/      # Fabric Gateway wrapper
+
+└── config/            # Env-var config loader
+
+test/services/
+
+├── integration_test.go   # HTTP endpoint tests
+
+├── e2e_test.go           # Full voter journey
+
+├── provision.go          # Test-side election provisioning
+
+└── helpers.go
 
 ### Status 
 
 Pre-production: Do not use for real elections. Independent security audit required
 before any deployment
+
+### Roadmap
+
+**Find:**
+```markdown
+- [x] **Milestone 1** — Cryptographic foundation
+- [x] **Milestone 2** — Fabric chaincode + dev network
+- [x] **Milestone 3** — Identity & casting services 
+- [ ] **Milestone 4** — Tally & public verifier portal (in progress)
+- [ ] **Milestone 5** — Production readiness (scale, HSM, audit)
+```
 
 ### License
 
