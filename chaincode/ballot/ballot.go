@@ -183,7 +183,7 @@ func (c *BallotContract) SubmitBallot(
 	ballot := Ballot{
 		BallotID:      ballotID,
 		ElectionID:    electionID,
-		EncryptedVote: []byte(encryptedVoteJSON),
+		EncryptedVote: encryptedVoteJSON,
 		TokenHash:     tokenHash,
 		CastAt:        now,
 		ChannelID:     ctx.GetStub().GetChannelID(),
@@ -287,7 +287,7 @@ func (c *BallotContract) GetEncryptedTally(
 			return nil, fmt.Errorf("corrupt ballot record: %w", err)
 		}
 
-		c1, c2, err := parseCiphertext(b.EncryptedVote)
+		c1, c2, err := parseCiphertext([]byte(b.EncryptedVote))
 		if err != nil {
 			return nil, fmt.Errorf("ballot %s: %w", b.BallotID, err)
 		}

@@ -88,9 +88,11 @@ done
 # --- 4. Get package ID ---
 log "Resolving package ID"
 PKG_ID=""
+EXPECTED_LABEL="${CHAINCODE_NAME}_${CHAINCODE_VERSION}"
 for msp in ElectoralCommissionMSP PartyAMSP PartyBMSP JudiciaryMSP; do
     OUT="$(peer_cli "$msp" "peer lifecycle chaincode queryinstalled" || true)"
-    PKG_ID="$(echo "$OUT" | grep -o "Package ID: [^,]*" | head -n1 | sed 's/Package ID: //')"
+    # Match the package ID whose label matches our target version
+    PKG_ID="$(echo "$OUT" | grep -o "Package ID: [^,]*, Label: ${EXPECTED_LABEL}$" | head -n1 | sed 's/Package ID: //;s/, Label: .*//')"
     if [[ -n "$PKG_ID" ]]; then
         break
     fi

@@ -30,7 +30,7 @@ type Election struct {
 type Ballot struct {
 	BallotID      string `json:"ballotId"`
 	ElectionID    string `json:"electionId"`
-	EncryptedVote []byte `json:"encryptedVote"`
+	EncryptedVote string `json:"encryptedVote"`
 	TokenHash     string `json:"tokenHash"`
 	CastAt        int64  `json:"castAt"`
 	ChannelID     string `json:"channelId"`

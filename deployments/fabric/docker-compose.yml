@@ -88,7 +88,7 @@ services:
       - CORE_VM_DOCKER_HOSTCONFIG_NETWORKMODE=fabric_dev
       - CORE_OPERATIONS_LISTENADDRESS=0.0.0.0:17051
       - CORE_METRICS_PROVIDER=prometheus
-      - CORE_CHAINCODE_EXECUTETIMEOUT=300s
+      - CORE_CHAINCODE_EXECUTETIMEOUT=1800s
     working_dir: /root
     command: peer node start
     volumes:
@@ -127,7 +127,7 @@ services:
       - CORE_VM_DOCKER_HOSTCONFIG_NETWORKMODE=fabric_dev
       - CORE_OPERATIONS_LISTENADDRESS=0.0.0.0:17052
       - CORE_METRICS_PROVIDER=prometheus
-      - CORE_CHAINCODE_EXECUTETIMEOUT=300s
+      - CORE_CHAINCODE_EXECUTETIMEOUT=1800s
     working_dir: /root
     command: peer node start
     volumes:
@@ -166,7 +166,7 @@ services:
       - CORE_VM_DOCKER_HOSTCONFIG_NETWORKMODE=fabric_dev
       - CORE_OPERATIONS_LISTENADDRESS=0.0.0.0:17053
       - CORE_METRICS_PROVIDER=prometheus
-      - CORE_CHAINCODE_EXECUTETIMEOUT=300s
+      - CORE_CHAINCODE_EXECUTETIMEOUT=1800s
     working_dir: /root
     command: peer node start
     volumes:
@@ -205,7 +205,7 @@ services:
       - CORE_VM_DOCKER_HOSTCONFIG_NETWORKMODE=fabric_dev
       - CORE_OPERATIONS_LISTENADDRESS=0.0.0.0:17054
       - CORE_METRICS_PROVIDER=prometheus
-      - CORE_CHAINCODE_EXECUTETIMEOUT=300s
+      - CORE_CHAINCODE_EXECUTETIMEOUT=1800s
     working_dir: /root
     command: peer node start
     volumes:
