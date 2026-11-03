@@ -311,6 +311,114 @@ func (c *BallotContract) GetEncryptedTally(
 	return &tally, nil
 }
 
+// PublishTally writes the decrypted per-candidate sums and ZK proofs to the
+// ledger. Only valid when the election is FROZEN (polls closed, results not
+// yet published). Once published, the election transitions to TALLIED.
+//
+// The caller must provide one proof per candidate. These proofs, together with
+// the encrypted tally already on-chain, let anyone verify that the decrypted
+// sums are correct.
+func (c *BallotContract) PublishTally(
+	ctx contractapi.TransactionContextInterface,
+	electionID string,
+	candidateResultsJSON string,
+	totalBallots int64,
+) error {
+	if electionID == "" || candidateResultsJSON == "" {
+		return errors.New("electionID and candidateResultsJSON are required")
+	}
+	if totalBallots < 0 {
+		return errors.New("totalBallots must be non-negative")
+	}
+
+	election, err := c.getElection(ctx, electionID)
+	if err != nil {
+		return err
+	}
+
+	// Only publishable when FROZEN. Prevents publishing on a live election.
+	if election.Phase != PhaseFrozen {
+		return fmt.Errorf("cannot publish tally: election is in phase %s (must be FROZEN)", election.Phase)
+	}
+
+	// Parse the candidate results.
+	var results []CandidateResult
+	if err := json.Unmarshal([]byte(candidateResultsJSON), &results); err != nil {
+		return fmt.Errorf("candidateResultsJSON must be a JSON array of CandidateResult: %w", err)
+	}
+
+	// Every candidate must have exactly one result.
+	if len(results) != len(election.Candidates) {
+		return fmt.Errorf("expected %d candidate results, got %d", len(election.Candidates), len(results))
+	}
+
+	// Each result's candidate name must match the election's declared candidate.
+	candidateSet := make(map[string]bool, len(election.Candidates))
+	for _, name := range election.Candidates {
+		candidateSet[name] = true
+	}
+	for _, r := range results {
+		if !candidateSet[r.Candidate] {
+			return fmt.Errorf("unknown candidate %q", r.Candidate)
+		}
+		if r.Proof == "" {
+			return fmt.Errorf("candidate %q has no proof", r.Candidate)
+		}
+	}
+
+	now, _ := getTxTimestamp(ctx)
+	tally := &TallyResult{
+		ElectionID:       electionID,
+		CandidateResults: results,
+		TotalBallots:     totalBallots,
+		PublishedAt:      now,
+	}
+
+	// Store the tally result.
+	if err := ctx.GetStub().PutState(tallyResultKey(electionID), mustMarshal(tally)); err != nil {
+		return err
+	}
+
+	// Transition the election to TALLIED and embed the result.
+	election.Phase = PhaseTallied
+	election.TallyResult = tally
+	if err := ctx.GetStub().PutState(electionKey(electionID), mustMarshal(election)); err != nil {
+		return err
+	}
+
+	// Emit event for verifier portal / public listeners.
+	eventPayload := mustMarshal(map[string]interface{}{
+		"electionID":   electionID,
+		"totalBallots": totalBallots,
+		"publishedAt":  now,
+	})
+	if err := ctx.GetStub().SetEvent("TallyPublished", eventPayload); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+// GetTally returns the published tally result for an election, or an error if
+// the tally hasn't been published yet.
+func (c *BallotContract) GetTally(
+	ctx contractapi.TransactionContextInterface,
+	electionID string,
+) (*TallyResult, error) {
+	data, err := ctx.GetStub().GetState(tallyResultKey(electionID))
+	if err != nil {
+		return nil, fmt.Errorf("failed to read tally: %w", err)
+	}
+	if data == nil {
+		return nil, fmt.Errorf("tally for election %q not published yet", electionID)
+	}
+	var t TallyResult
+	if err := json.Unmarshal(data, &t); err != nil {
+		return nil, fmt.Errorf("corrupt tally record: %w", err)
+	}
+	return &t, nil
+}
+
 /*
 parseCiphertext extracts (C1, C2) from a JSON-serialized ciphertext
 Expected to look like {"C1": <bigint-string>, "C2": <bigint-string>}

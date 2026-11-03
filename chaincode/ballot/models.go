@@ -24,6 +24,7 @@ type Election struct {
 	HomomorphicPubKey string        `json:"homomorphicPubKey"`
 	RegisteredAt      int64         `json:"registeredAt"`
 	FrozenAt          int64         `json:"frozenAt.omitempty"`
+	TallyResult       *TallyResult  `json:"tallyResult,omitempty"`
 }
 
 // Ballot is an encrypted vote as stored on the ledger
@@ -81,4 +82,26 @@ func mustMarshal(v interface{}) []byte {
 		panic(fmt.Sprintf("marshal failed: %v", err))
 	}
 	return b
+}
+
+// CandidateResult is one candidate's decrypted total plus the ZK proof that
+// decryption was correct.
+type CandidateResult struct {
+	Candidate string `json:"candidate"`
+	Sum       int64  `json:"sum"`
+	Proof     string `json:"proof"` // JSON-serialized zkproofs.DecryptionProof
+}
+
+// TallyResult is the published, decrypted tally for an election.
+// Written to the ledger after the threshold decryption ceremony.
+type TallyResult struct {
+	ElectionID       string            `json:"electionId"`
+	CandidateResults []CandidateResult `json:"candidateResults"`
+	TotalBallots     int64             `json:"totalBallots"`
+	PublishedAt      int64             `json:"publishedAt"`
+}
+
+// tallyResultKey returns the ledger key for a published tally result.
+func tallyResultKey(electionID string) string {
+	return fmt.Sprintf("TALLYRESULT_%s", electionID)
 }

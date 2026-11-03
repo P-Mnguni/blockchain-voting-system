@@ -326,6 +326,147 @@ func TestBallotCastEventEmitted(t *testing.T) {
 	}
 }
 
+func TestPublishTallySuccess(t *testing.T) {
+	ctx, _ := testContext(t)
+	c := &BallotContract{}
+
+	// Setup: register, start, cast, freeze
+	must(t, c.RegisterElection(ctx, "e1", "E", `["A","B"]`, "pk"))
+	must(t, c.StartVoting(ctx, "e1"))
+	must(t, c.SubmitBallot(ctx, "e1", "b1", makeEncryptedVote("2", "7"), "t1"))
+	must(t, c.SubmitBallot(ctx, "e1", "b2", makeEncryptedVote("3", "11"), "t2"))
+	must(t, c.FreezeElection(ctx, "e1"))
+
+	// Publish tally
+	results := `[
+		{"candidate":"A","sum":1,"proof":"fake-proof-a"},
+		{"candidate":"B","sum":1,"proof":"fake-proof-b"}
+	]`
+	must(t, c.PublishTally(ctx, "e1", results, 2))
+
+	// Read it back
+	tally, err := c.GetTally(ctx, "e1")
+	if err != nil {
+		t.Fatalf("GetTally failed: %v", err)
+	}
+	if tally.TotalBallots != 2 {
+		t.Errorf("totalBallots: got %d, want 2", tally.TotalBallots)
+	}
+	if len(tally.CandidateResults) != 2 {
+		t.Errorf("candidateResults: got %d, want 2", len(tally.CandidateResults))
+	}
+
+	// Election should be TALLIED
+	election, _ := c.getElection(ctx, "e1")
+	if election.Phase != PhaseTallied {
+		t.Errorf("phase: got %s, want TALLIED", election.Phase)
+	}
+	if election.TallyResult == nil {
+		t.Error("election.TallyResult should be set")
+	}
+}
+
+func TestPublishTallyRequiresFrozen(t *testing.T) {
+	ctx, _ := testContext(t)
+	c := &BallotContract{}
+
+	must(t, c.RegisterElection(ctx, "e1", "E", `["A","B"]`, "pk"))
+	must(t, c.StartVoting(ctx, "e1"))
+	// Not frozen
+
+	results := `[{"candidate":"A","sum":0,"proof":"p"},{"candidate":"B","sum":0,"proof":"p"}]`
+	err := c.PublishTally(ctx, "e1", results, 0)
+	if err == nil {
+		t.Fatal("PublishTally should fail when election is not FROZEN")
+	}
+}
+
+func TestPublishTallyRejectsMismatchedCandidates(t *testing.T) {
+	ctx, _ := testContext(t)
+	c := &BallotContract{}
+
+	must(t, c.RegisterElection(ctx, "e1", "E", `["A","B"]`, "pk"))
+	must(t, c.StartVoting(ctx, "e1"))
+	must(t, c.FreezeElection(ctx, "e1"))
+
+	// Wrong count (1 instead of 2)
+	results := `[{"candidate":"A","sum":1,"proof":"p"}]`
+	err := c.PublishTally(ctx, "e1", results, 1)
+	if err == nil {
+		t.Fatal("PublishTally should fail with wrong candidate count")
+	}
+}
+
+func TestPublishTallyRejectsUnknownCandidate(t *testing.T) {
+	ctx, _ := testContext(t)
+	c := &BallotContract{}
+
+	must(t, c.RegisterElection(ctx, "e1", "E", `["A","B"]`, "pk"))
+	must(t, c.StartVoting(ctx, "e1"))
+	must(t, c.FreezeElection(ctx, "e1"))
+
+	// "C" isn't a candidate
+	results := `[{"candidate":"A","sum":1,"proof":"p"},{"candidate":"C","sum":1,"proof":"p"}]`
+	err := c.PublishTally(ctx, "e1", results, 2)
+	if err == nil {
+		t.Fatal("PublishTally should reject unknown candidate")
+	}
+}
+
+func TestPublishTallyRejectsEmptyProof(t *testing.T) {
+	ctx, _ := testContext(t)
+	c := &BallotContract{}
+
+	must(t, c.RegisterElection(ctx, "e1", "E", `["A","B"]`, "pk"))
+	must(t, c.StartVoting(ctx, "e1"))
+	must(t, c.FreezeElection(ctx, "e1"))
+
+	results := `[{"candidate":"A","sum":1,"proof":""},{"candidate":"B","sum":1,"proof":"p"}]`
+	err := c.PublishTally(ctx, "e1", results, 2)
+	if err == nil {
+		t.Fatal("PublishTally should reject missing proof")
+	}
+}
+
+func TestGetTallyNotPublished(t *testing.T) {
+	ctx, _ := testContext(t)
+	c := &BallotContract{}
+
+	must(t, c.RegisterElection(ctx, "e1", "E", `["A","B"]`, "pk"))
+
+	_, err := c.GetTally(ctx, "e1")
+	if err == nil {
+		t.Fatal("GetTally should fail before publish")
+	}
+}
+
+func TestPublishTallyEmitsEvent(t *testing.T) {
+	ctx, stub := testContext(t)
+	c := &BallotContract{}
+
+	must(t, c.RegisterElection(ctx, "e1", "E", `["A","B"]`, "pk"))
+	must(t, c.StartVoting(ctx, "e1"))
+	must(t, c.FreezeElection(ctx, "e1"))
+
+	results := `[{"candidate":"A","sum":3,"proof":"p"},{"candidate":"B","sum":2,"proof":"p"}]`
+	must(t, c.PublishTally(ctx, "e1", results, 5))
+
+	// Verify event was emitted
+	events := stub.Events()
+	found := false
+	for _, e := range events {
+		if e.EventName == "TallyPublished" {
+			found = true
+			if !strings.Contains(string(e.Payload), "e1") {
+				t.Errorf("event payload missing electionID: %s", e.Payload)
+			}
+		}
+	}
+	if !found {
+		t.Error("TallyPublished event was not emitted")
+	}
+}
+
 // --- helpers ---
 
 func must(t *testing.T, err error) {
