@@ -84,12 +84,26 @@ func SaveShare(path, keyholderID, passphrase string, share shamir.Share, outputL
 	if err := os.MkdirAll(filepath.Dir(path), 0o700); err != nil {
 		return fmt.Errorf("create share directory: %w", err)
 	}
+
 	data, err := json.MarshalIndent(record, "", "  ")
 	if err != nil {
 		return fmt.Errorf("marshal record: %w", err)
 	}
-	if err := os.WriteFile(path, data, 0o600); err != nil {
-		return fmt.Errorf("write share: %w", err)
+
+	// Write to a temp file with restrictive mode, then rename.
+	// This avoids partial writes and ensures permissions.
+	tmpPath := path + ".tmp"
+	if err := os.WriteFile(tmpPath, data, 0o600); err != nil {
+		return fmt.Errorf("write temp share: %w", err)
+	}
+	// Force 0600 in case umask stripped it
+	if err := os.Chmod(tmpPath, 0o600); err != nil {
+		os.Remove(tmpPath)
+		return fmt.Errorf("chmod temp share: %w", err)
+	}
+	if err := os.Rename(tmpPath, path); err != nil {
+		os.Remove(tmpPath)
+		return fmt.Errorf("rename temp share: %w", err)
 	}
 	return nil
 }
