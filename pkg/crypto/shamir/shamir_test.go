@@ -138,7 +138,7 @@ func TestGF256Arithmetic(t *testing.T) {
 
 func BenchmarkSplit(b *testing.B) {
 	secret := make([]byte, 32)
-	for i := 0; i < b.N; i++ {
+	for b.Loop() {
 		Split(secret, 5, 3)
 	}
 }
@@ -146,8 +146,7 @@ func BenchmarkSplit(b *testing.B) {
 func BenchmarkCombine(b *testing.B) {
 	secret := make([]byte, 32)
 	shares, _ := Split(secret, 5, 3)
-	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
+	for b.Loop() {
 		Combine(shares[:3])
 	}
 }
