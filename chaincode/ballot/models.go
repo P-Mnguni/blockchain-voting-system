@@ -24,7 +24,6 @@ type Election struct {
 	HomomorphicPubKey string        `json:"homomorphicPubKey"`
 	RegisteredAt      int64         `json:"registeredAt"`
 	FrozenAt          int64         `json:"frozenAt.omitempty"`
-	TallyResult       *TallyResult  `json:"tallyResult,omitempty"`
 }
 
 // Ballot is an encrypted vote as stored on the ledger

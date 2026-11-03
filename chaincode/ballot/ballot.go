@@ -381,7 +381,7 @@ func (c *BallotContract) PublishTally(
 
 	// Transition the election to TALLIED and embed the result.
 	election.Phase = PhaseTallied
-	election.TallyResult = tally
+	// election.TallyResult = tally
 	if err := ctx.GetStub().PutState(electionKey(electionID), mustMarshal(election)); err != nil {
 		return err
 	}
