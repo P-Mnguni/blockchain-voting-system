@@ -50,7 +50,7 @@ func (h *CastingHandler) Cast(w http.ResponseWriter, r *http.Request) {
 			writeError(w, http.StatusForbidden, msg)
 		} else {
 			log.Printf("[casting] Cast failed: %v", err)
-			writeError(w, http.StatusInternalServerError, "cast failed")
+    			writeError(w, http.StatusInternalServerError, "cast failed: "+msg)
 		}
 		return
 	}

@@ -23,6 +23,9 @@ func uniqueElectionID(t *testing.T) string {
 
 func setup(t *testing.T) (*Gateway, NetworkConfig) {
 	t.Helper()
+
+	time.Sleep(1 * time.Second)
+
 	cfg := DefaultConfig()
 	gw, err := Connect(cfg)
 	if err != nil {

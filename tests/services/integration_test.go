@@ -134,7 +134,10 @@ func TestCastRejectsDuplicateCredential(t *testing.T) {
 		t.Fatalf("register: %v", err)
 	}
 
-	encryptedBallot, _ := json.Marshal(map[string]string{"C1": "10", "C2": "20"})
+	encryptedBallot, _ := json.Marshal([]string{
+    		`{"C1":"10","C2":"20"}`,
+    		`{"C1":"30","C2":"40"}`,
+	})
 	body := castReq{
 		ElectionID:      electionID,
 		EncryptedBallot: string(encryptedBallot),
@@ -159,7 +162,10 @@ func TestCastRejectsGarbageCredential(t *testing.T) {
 	defer cleanup()
 
 	cast := NewHTTPClient(castURL)
-	encryptedBallot, _ := json.Marshal(map[string]string{"C1": "10", "C2": "20"})
+	encryptedBallot, _ := json.Marshal([]string{
+    		`{"C1":"10","C2":"20"}`,
+    		`{"C1":"30","C2":"40"}`,
+	})
 
 	code, err := cast.PostJSON("/cast", castReq{
 		ElectionID:      electionID,

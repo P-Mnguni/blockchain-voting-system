@@ -22,8 +22,8 @@ export FABRIC_CA_VERSION="1.5.13"
 # --- Network identity ---
 export CHANNEL_NAME="electionchannel"
 export CHAINCODE_NAME="ballot"
-export CHAINCODE_VERSION="1.4"
-export CHAINCODE_SEQUENCE="6"
+export CHAINCODE_VERSION="1.5"
+export CHAINCODE_SEQUENCE="7"
 
 # --- Orderer ---
 export ORDERER_HOST="orderer.electoralcommission.example.com"

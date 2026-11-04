@@ -101,9 +101,9 @@ func Connect(cfg Config) (Client, error) {
 		id,
 		client.WithSign(sign),
 		client.WithClientConnection(conn),
-		client.WithEvaluateTimeout(5*time.Second),
+		client.WithEvaluateTimeout(30*time.Second),
 		client.WithEndorseTimeout(cfg.Timeout),
-		client.WithSubmitTimeout(5*time.Second),
+		client.WithSubmitTimeout(30*time.Second),
 		client.WithCommitStatusTimeout(cfg.Timeout),
 	)
 	if err != nil {
