@@ -77,9 +77,12 @@ func (c *Client) Register(voterID, electionID string) (*RegisterResponse, error)
 	return &resp, nil
 }
 
-// Cast encrypts vote locally, then submits it to the casting service.
-// Vote must be 0 or 1 (binary election).
-func (c *Client) Cast(electionID, credential string, vote int64) (*Receipt, error) {
+// Cast encrypts one vote per candidate (each 0 or 1), then submits to the
+// casting service. votes[i] is the vote for election.Candidates[i].
+//
+// Exactly one entry should be 1 (for the chosen candidate) and the rest 0.
+// The client validates this before sending.
+func (c *Client) Cast(electionID, credential string, votes []int64) (*Receipt, error) {
 	if c.CastingURL == "" {
 		return nil, fmt.Errorf("casting URL not set")
 	}
@@ -89,27 +92,47 @@ func (c *Client) Cast(electionID, credential string, vote int64) (*Receipt, erro
 	if electionID == "" || credential == "" {
 		return nil, fmt.Errorf("electionID and credential are required")
 	}
-	if vote != 0 && vote != 1 {
-		return nil, fmt.Errorf("vote must be 0 or 1")
+	if len(votes) == 0 {
+		return nil, fmt.Errorf("votes array is empty")
+	}
+	// Validate: each is 0 or 1, exactly one is 1
+	ones := 0
+	for i, v := range votes {
+		if v != 0 && v != 1 {
+			return nil, fmt.Errorf("vote[%d] must be 0 or 1, got %d", i, v)
+		}
+		if v == 1 {
+			ones++
+		}
+	}
+	if ones != 1 {
+		return nil, fmt.Errorf("exactly one vote must be 1, got %d", ones)
 	}
 
-	// 1. Encrypt the vote locally.
-	ct, err := c.ElectionPubKey.EncryptVote(vote)
+	// Encrypt each candidate's vote
+	encryptedVotes := make([]string, len(votes))
+	for i, vote := range votes {
+		ct, err := c.ElectionPubKey.EncryptVote(vote)
+		if err != nil {
+			return nil, fmt.Errorf("encrypt vote[%d]: %w", i, err)
+		}
+		b, err := marshalCiphertext(ct)
+		if err != nil {
+			return nil, fmt.Errorf("marshal vote[%d]: %w", i, err)
+		}
+		encryptedVotes[i] = b
+	}
+
+	// Serialize the array
+	votesJSON, err := json.Marshal(encryptedVotes)
 	if err != nil {
-		return nil, fmt.Errorf("encrypt vote: %w", err)
+		return nil, fmt.Errorf("marshal votes array: %w", err)
 	}
 
-	// 2. Serialize ciphertext as {"C1": "<decimal>", "C2": "<decimal>"}.
-	//    This is the format the chaincode expects.
-	encryptedBallot, err := marshalCiphertext(ct)
-	if err != nil {
-		return nil, err
-	}
-
-	// 3. Submit to casting service.
+	// Submit
 	body := map[string]string{
 		"electionId":      electionID,
-		"encryptedBallot": encryptedBallot,
+		"encryptedBallot": string(votesJSON),
 		"credential":      credential,
 	}
 	raw, code, err := c.postJSON(c.CastingURL+"/cast", body)

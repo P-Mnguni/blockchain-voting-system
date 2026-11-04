@@ -75,32 +75,33 @@ func TestCastEncryptsAndSubmits(t *testing.T) {
 	_, pubKey := newTestKeyPair(t)
 	c := NewClient(srv.URL, srv.URL, pubKey)
 
-	receipt, err := c.Cast("election-1", "cred-xyz", 1)
+	// Vote for candidate 0 (2 candidates)
+	receipt, err := c.Cast("election-1", "cred-xyz", []int64{1, 0})
 	if err != nil {
 		t.Fatalf("cast: %v", err)
 	}
 	if receipt.BallotID != "ballot-123" {
 		t.Errorf("ballot ID mismatch")
 	}
-
-	// Verify the body contains an encrypted ballot, not the plaintext vote.
 	if capturedBody["encryptedBallot"] == "" {
 		t.Fatal("encryptedBallot not sent")
 	}
-	if capturedBody["encryptedBallot"] == "1" {
-		t.Error("plaintext vote leaked — encryption not applied")
+	// encryptedBallot should be a JSON array of 2 ciphertexts
+	var votes []string
+	if err := json.Unmarshal([]byte(capturedBody["encryptedBallot"]), &votes); err != nil {
+		t.Fatalf("encryptedBallot is not a JSON array: %v (raw: %s)", err, capturedBody["encryptedBallot"])
 	}
-	if capturedBody["credential"] != "cred-xyz" {
-		t.Error("credential not forwarded")
+	if len(votes) != 2 {
+		t.Errorf("expected 2 encrypted votes, got %d", len(votes))
 	}
-
-	// Verify encryptedBallot is valid JSON ciphertext with C1/C2.
-	var ct struct{ C1, C2 string }
-	if err := json.Unmarshal([]byte(capturedBody["encryptedBallot"]), &ct); err != nil {
-		t.Fatalf("encryptedBallot is not valid JSON: %v", err)
-	}
-	if ct.C1 == "" || ct.C2 == "" {
-		t.Error("ciphertext missing C1 or C2")
+	for i, v := range votes {
+		var ct struct{ C1, C2 string }
+		if err := json.Unmarshal([]byte(v), &ct); err != nil {
+			t.Fatalf("vote[%d] not a ciphertext: %v", i, err)
+		}
+		if ct.C1 == "" || ct.C2 == "" {
+			t.Errorf("vote[%d] missing C1 or C2", i)
+		}
 	}
 }
 
@@ -108,17 +109,31 @@ func TestCastRejectsInvalidVote(t *testing.T) {
 	_, pubKey := newTestKeyPair(t)
 	c := NewClient("http://unused", "http://unused", pubKey)
 
-	if _, err := c.Cast("e", "c", 2); err == nil {
+	// Empty array
+	if _, err := c.Cast("e", "c", []int64{}); err == nil {
+		t.Error("empty votes should be rejected")
+	}
+	// All zeros
+	if _, err := c.Cast("e", "c", []int64{0, 0}); err == nil {
+		t.Error("all-zero votes should be rejected")
+	}
+	// More than one 1
+	if _, err := c.Cast("e", "c", []int64{1, 1}); err == nil {
+		t.Error("multiple 1-votes should be rejected")
+	}
+	// Value 2
+	if _, err := c.Cast("e", "c", []int64{2, 0}); err == nil {
 		t.Error("vote=2 should be rejected")
 	}
-	if _, err := c.Cast("e", "c", -1); err == nil {
-		t.Error("vote=-1 should be rejected")
+	// Negative
+	if _, err := c.Cast("e", "c", []int64{-1, 1}); err == nil {
+		t.Error("negative vote should be rejected")
 	}
 }
 
 func TestCastRequiresPublicKey(t *testing.T) {
 	c := NewClient("http://unused", "http://unused", nil)
-	if _, err := c.Cast("e", "c", 1); err == nil {
+	if _, err := c.Cast("e", "c", []int64{1, 0}); err == nil {
 		t.Error("missing public key should fail")
 	}
 }

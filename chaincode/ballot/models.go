@@ -26,14 +26,18 @@ type Election struct {
 	FrozenAt          int64         `json:"frozenAt.omitempty"`
 }
 
-// Ballot is an encrypted vote as stored on the ledger
+// Ballot is an encrypted vote as stored on the ledger.
+//
+// EncryptedVotes is one ciphertext per candidate, in the same order as
+// Election.Candidates. A vote for candidate i is encrypted as Enc(1) at
+// position i and Enc(0) at all other positions.
 type Ballot struct {
-	BallotID      string `json:"ballotId"`
-	ElectionID    string `json:"electionId"`
-	EncryptedVote string `json:"encryptedVote"`
-	TokenHash     string `json:"tokenHash"`
-	CastAt        int64  `json:"castAt"`
-	ChannelID     string `json:"channelId"`
+	BallotID       string   `json:"ballotId"`
+	ElectionID     string   `json:"electionId"`
+	EncryptedVotes []string `json:"encryptedVotes"`
+	TokenHash      string   `json:"tokenHash"`
+	CastAt         int64    `json:"castAt"`
+	ChannelID      string   `json:"channelId"`
 }
 
 // TokenRecord marks a token hash as spent.Existence = spent.
@@ -43,13 +47,16 @@ type TokenRecord struct {
 	SpentAt    int64  `json:"spentAt"`
 }
 
-// EncryptedTally is the homomorphic sum of all ballots in an election
-type EncryptedTally struct {
-	ElectionID  string `json:"electionId"`
-	C1          string `json:"c1"`
-	C2          string `json:"c2"`
-	BallotCount int64  `json:"ballotCount"`
-	ComputedAt  int64  `json:"computedAt"`
+// PerCandidateTally is the homomorphic sum per candidate for an election.
+// C1s and C2s are the two components of each candidate's accumulated ElGamal
+// ciphertext, stored as decimal strings.
+type PerCandidateTally struct {
+	ElectionID  string   `json:"electionId"`
+	Candidates  []string `json:"candidates"` // same order as Election.Candidates
+	C1s         []string `json:"c1s"`        // one per candidate
+	C2s         []string `json:"c2s"`        // one per candidate
+	BallotCount int64    `json:"ballotCount"`
+	ComputedAt  int64    `json:"computedAt"`
 }
 
 // HELPERS FOR COMPOSITE KEYS
@@ -69,9 +76,9 @@ func tokenKey(electionID, tokenHash string) string {
 	return fmt.Sprintf("TOKEN_%s_%s", electionID, tokenHash)
 }
 
-// tallyKey returns the ledger key for an encrypted tally
-func tallyKey(electionID string) string {
-	return fmt.Sprintf("TALLEY_%s", electionID)
+// encryptedTallyKey returns the ledger key for an encrypted tally
+func encryptedTallyKey(electionID string) string {
+	return fmt.Sprintf("TALLYENC_%s", electionID)
 }
 
 // mustMarshal panics on marshal error
