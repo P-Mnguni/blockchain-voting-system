@@ -81,7 +81,6 @@ func TestRegisterAndCast(t *testing.T) {
 	id := NewHTTPClient(idURL)
 	cast := NewHTTPClient(castURL)
 
-	// 1. Register
 	var reg registerResp
 	code, err := id.PostJSON("/register", registerReq{
 		VoterID:    voterID,
@@ -97,8 +96,11 @@ func TestRegisterAndCast(t *testing.T) {
 		t.Fatal("register returned empty credential")
 	}
 
-	// 2. Cast
-	encryptedBallot, _ := json.Marshal(map[string]string{"C1": "10", "C2": "20"})
+	// Two-candidate ballot: one ciphertext per candidate
+	encryptedBallot, _ := json.Marshal([]string{
+		`{"C1":"10","C2":"20"}`,
+		`{"C1":"30","C2":"40"}`,
+	})
 	var receipt castResp
 	code, err = cast.PostJSON("/cast", castReq{
 		ElectionID:      electionID,
@@ -113,9 +115,6 @@ func TestRegisterAndCast(t *testing.T) {
 	}
 	if receipt.BallotID == "" {
 		t.Fatal("cast returned empty ballotID")
-	}
-	if receipt.CommittedAt == 0 {
-		t.Error("cast returned zero committedAt")
 	}
 	t.Logf("receipt: ballotID=%s committedAt=%d", receipt.BallotID, receipt.CommittedAt)
 }

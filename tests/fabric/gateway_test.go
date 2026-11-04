@@ -9,8 +9,6 @@ import (
 	"time"
 )
 
-// skipIfNoNetwork skips the test if the integration flag isn't set.
-// This lets `go test ./...` run without a live Fabric network.
 func skipIfNoNetwork(t *testing.T) {
 	t.Helper()
 	if os.Getenv("FABRIC_INTEGRATION") != "1" {
@@ -18,14 +16,11 @@ func skipIfNoNetwork(t *testing.T) {
 	}
 }
 
-// uniqueElectionID returns a fresh election ID per run, so tests don't
-// collide on ledger state.
 func uniqueElectionID(t *testing.T) string {
 	t.Helper()
 	return fmt.Sprintf("test-election-%d", time.Now().UnixNano())
 }
 
-// setup connects to the network and returns a Gateway + helper.
 func setup(t *testing.T) (*Gateway, NetworkConfig) {
 	t.Helper()
 	cfg := DefaultConfig()
@@ -37,7 +32,6 @@ func setup(t *testing.T) (*Gateway, NetworkConfig) {
 	return gw, cfg
 }
 
-// registerElection registers an election with two candidates.
 func registerElection(t *testing.T, gw *Gateway, electionID string) {
 	t.Helper()
 	candidates := `["Alice","Bob"]`
@@ -49,7 +43,6 @@ func registerElection(t *testing.T, gw *Gateway, electionID string) {
 	}
 }
 
-// startVoting transitions an election to VOTING.
 func startVoting(t *testing.T, gw *Gateway, electionID string) {
 	t.Helper()
 	_, err := gw.Contract.SubmitTransaction("StartVoting", electionID)
@@ -58,21 +51,24 @@ func startVoting(t *testing.T, gw *Gateway, electionID string) {
 	}
 }
 
-// submitBallot casts one ballot.
-func submitBallot(t *testing.T, gw *Gateway, electionID, ballotID, encVote, token string) error {
+func submitBallot(t *testing.T, gw *Gateway, electionID, ballotID, encVotes, token string) error {
 	t.Helper()
-	_, err := gw.Contract.SubmitTransaction("SubmitBallot", electionID, ballotID, encVote, token)
+	_, err := gw.Contract.SubmitTransaction("SubmitBallot", electionID, ballotID, encVotes, token)
 	return err
 }
 
-// makeEncryptedVote produces a JSON ciphertext blob the chaincode will accept.
-// The chaincode only cares that C1/C2 are decimal strings.
-func makeEncryptedVote(c1, c2 string) string {
-	b, _ := json.Marshal(map[string]string{"C1": c1, "C2": c2})
-	return string(b)
+// makeEncryptedVotes produces a JSON array of ciphertexts, one "C1,C2" pair
+// per candidate.
+func makeEncryptedVotes(c1s, c2s []string) string {
+	var votes []string
+	for i := range c1s {
+		b, _ := json.Marshal(map[string]string{"C1": c1s[i], "C2": c2s[i]})
+		votes = append(votes, string(b))
+	}
+	out, _ := json.Marshal(votes)
+	return string(out)
 }
 
-// evaluateTally fetches the encrypted tally.
 func evaluateTally(t *testing.T, gw *Gateway, electionID string) map[string]interface{} {
 	t.Helper()
 	result, err := gw.Contract.EvaluateTransaction("GetEncryptedTally", electionID)
@@ -92,8 +88,6 @@ func TestHealthCheck(t *testing.T) {
 	skipIfNoNetwork(t)
 	gw, _ := setup(t)
 
-	// RegisterElection is a write — proves we can submit + commit.
-	// Use a random ID so this is repeatable.
 	id := uniqueElectionID(t)
 	defer t.Logf("electionID = %s", id)
 
@@ -111,56 +105,52 @@ func TestFullElectionFlow(t *testing.T) {
 	registerElection(t, gw, electionID)
 	startVoting(t, gw, electionID)
 
-	// Cast 10 ballots: 6 for "1", 4 for "0"
+	// Cast 10 ballots: 6 for A, 4 for B
 	const numVotes = 10
-	expectedSum := int64(0)
 	for i := 0; i < numVotes; i++ {
-		var c1, c2 string
-		var vote int64
+		var encVotes string
 		if i < 6 {
-			vote = 1
-			c1, c2 = "100", "200" // arbitrary nonzero decimal
+			encVotes = makeEncryptedVotes([]string{"100", "150"}, []string{"200", "250"})
 		} else {
-			vote = 0
-			c1, c2 = "150", "250"
+			encVotes = makeEncryptedVotes([]string{"150", "100"}, []string{"250", "200"})
 		}
-		expectedSum += vote
-
-		err := submitBallot(t, gw, electionID, fmt.Sprintf("ballot-%d", i), makeEncryptedVote(c1, c2), fmt.Sprintf("token-%d", i))
+		err := submitBallot(t, gw, electionID, fmt.Sprintf("ballot-%d", i), encVotes, fmt.Sprintf("token-%d", i))
 		if err != nil {
 			t.Fatalf("SubmitBallot %d failed: %v", i, err)
 		}
 	}
 
-	// Freeze
 	if _, err := gw.Contract.SubmitTransaction("FreezeElection", electionID); err != nil {
 		t.Fatalf("FreezeElection failed: %v", err)
 	}
 
-	// Tally
 	tally := evaluateTally(t, gw, electionID)
 
-	// Verify ballot count
 	gotCount := int64(tally["ballotCount"].(float64))
 	if gotCount != numVotes {
 		t.Errorf("expected %d ballots, got %d", numVotes, gotCount)
 	}
 
-	// Verify homomorphic sum (product of C1s and C2s)
-	// Since we used (100,200) x6 and (150,250) x4, the C1 product
-	// should be 100^6 * 150^4 and C2 product 200^6 * 250^4.
-	expectedC1 := new(big.Int).Exp(big.NewInt(100), big.NewInt(6), nil)
-	expectedC1.Mul(expectedC1, new(big.Int).Exp(big.NewInt(150), big.NewInt(4), nil))
-
-	gotC1, ok := new(big.Int).SetString(tally["c1"].(string), 10)
-	if !ok {
-		t.Fatalf("could not parse c1: %v", tally["c1"])
-	}
-	if gotC1.Cmp(expectedC1) != 0 {
-		t.Errorf("c1 mismatch: got %s, want %s", gotC1, expectedC1)
+	candidates, ok := tally["candidates"].([]interface{})
+	if !ok || len(candidates) != 2 {
+		t.Fatalf("expected 2 candidates in tally, got %v", tally["candidates"])
 	}
 
-	t.Logf("tally: count=%d, c1=%s (matches expected)", gotCount, gotC1)
+	c1s, ok := tally["c1s"].([]interface{})
+	if !ok || len(c1s) != 2 {
+		t.Fatalf("expected 2 C1s, got %v", tally["c1s"])
+	}
+
+	// Candidate A: 6 votes of C1=100 and 4 votes of C1=150
+	// C1_A = 100^6 * 150^4
+	expectedA := new(big.Int).Exp(big.NewInt(100), big.NewInt(6), nil)
+	expectedA.Mul(expectedA, new(big.Int).Exp(big.NewInt(150), big.NewInt(4), nil))
+	gotA, _ := new(big.Int).SetString(c1s[0].(string), 10)
+	if gotA.Cmp(expectedA) != 0 {
+		t.Errorf("C1_A mismatch: got %s, want %s", gotA, expectedA)
+	}
+
+	t.Logf("tally: count=%d, C1_A matches expected (%d bytes)", gotCount, len(gotA.String()))
 }
 
 func TestDoubleSpendRejected(t *testing.T) {
@@ -172,7 +162,7 @@ func TestDoubleSpendRejected(t *testing.T) {
 	registerElection(t, gw, electionID)
 	startVoting(t, gw, electionID)
 
-	enc := makeEncryptedVote("10", "20")
+	enc := makeEncryptedVotes([]string{"10", "20"}, []string{"30", "40"})
 	if err := submitBallot(t, gw, electionID, "ballot-1", enc, "shared-token"); err != nil {
 		t.Fatalf("first SubmitBallot should succeed: %v", err)
 	}
@@ -193,18 +183,16 @@ func TestSubmitAfterFreezeRejected(t *testing.T) {
 	registerElection(t, gw, electionID)
 	startVoting(t, gw, electionID)
 
-	// Cast one valid ballot
-	if err := submitBallot(t, gw, electionID, "ballot-1", makeEncryptedVote("1", "2"), "token-1"); err != nil {
+	enc := makeEncryptedVotes([]string{"1", "2"}, []string{"3", "4"})
+	if err := submitBallot(t, gw, electionID, "ballot-1", enc, "token-1"); err != nil {
 		t.Fatalf("SubmitBallot should succeed: %v", err)
 	}
 
-	// Freeze
 	if _, err := gw.Contract.SubmitTransaction("FreezeElection", electionID); err != nil {
 		t.Fatalf("FreezeElection failed: %v", err)
 	}
 
-	// Try to submit after freeze
-	err := submitBallot(t, gw, electionID, "ballot-2", makeEncryptedVote("3", "4"), "token-2")
+	err := submitBallot(t, gw, electionID, "ballot-2", enc, "token-2")
 	if err == nil {
 		t.Fatal("SubmitBallot after freeze should fail")
 	}
@@ -218,11 +206,47 @@ func TestSubmitBeforeVotingRejected(t *testing.T) {
 	electionID := uniqueElectionID(t)
 	t.Logf("electionID = %s", electionID)
 	registerElection(t, gw, electionID)
-	// Note: NOT calling StartVoting — phase remains REGISTRATION
 
-	err := submitBallot(t, gw, electionID, "ballot-1", makeEncryptedVote("1", "2"), "token-1")
+	enc := makeEncryptedVotes([]string{"1", "2"}, []string{"3", "4"})
+	err := submitBallot(t, gw, electionID, "ballot-1", enc, "token-1")
 	if err == nil {
 		t.Fatal("SubmitBallot in REGISTRATION phase should fail")
 	}
 	t.Logf("correctly rejected pre-voting submission: %v", err)
+}
+
+func TestGetAllBallots(t *testing.T) {
+	skipIfNoNetwork(t)
+	gw, _ := setup(t)
+
+	electionID := uniqueElectionID(t)
+	t.Logf("electionID = %s", electionID)
+	registerElection(t, gw, electionID)
+	startVoting(t, gw, electionID)
+
+	for i := 0; i < 3; i++ {
+		enc := makeEncryptedVotes([]string{"10", "20"}, []string{"30", "40"})
+		if err := submitBallot(t, gw, electionID, fmt.Sprintf("b%d", i), enc, fmt.Sprintf("t%d", i)); err != nil {
+			t.Fatalf("SubmitBallot %d failed: %v", i, err)
+		}
+	}
+
+	result, err := gw.Contract.EvaluateTransaction("GetAllBallots", electionID)
+	if err != nil {
+		t.Fatalf("GetAllBallots failed: %v", err)
+	}
+
+	var ballots []map[string]interface{}
+	if err := json.Unmarshal(result, &ballots); err != nil {
+		t.Fatalf("ballots JSON parse: %v (raw: %s)", err, result)
+	}
+	if len(ballots) != 3 {
+		t.Errorf("expected 3 ballots, got %d", len(ballots))
+	}
+	for _, b := range ballots {
+		votes, ok := b["encryptedVotes"].([]interface{})
+		if !ok || len(votes) != 2 {
+			t.Errorf("ballot %v has wrong encryptedVotes", b["ballotId"])
+		}
+	}
 }
