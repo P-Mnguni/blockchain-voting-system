@@ -135,24 +135,23 @@ func (c *BallotContract) getElection(
 
 // BALLOT OPERATIONS
 
-/*
-SubmitBallot casts a vote. Requirements:
-- election must exist and be in VOTING phase
-- the token hash must not already be spent in this election
-- ballotID must not collide with an existing ballot
-*/
+// SubmitBallot casts a vote. Requirements:
+//   - election must exist and be in VOTING phase
+//   - the token hash must not already be spent in this election
+//   - ballotID must not collide with an existing ballot
+//   - encryptedVotesJSON must be a JSON array with exactly one entry per candidate
 func (c *BallotContract) SubmitBallot(
 	ctx contractapi.TransactionContextInterface,
 	electionID string,
 	ballotID string,
-	encryptedVoteJSON string,
+	encryptedVotesJSON string,
 	tokenHash string,
 ) error {
 	if electionID == "" || ballotID == "" || tokenHash == "" {
 		return errors.New("electionID, ballotID, and tokenHash are required")
 	}
-	if len(encryptedVoteJSON) == 0 {
-		return errors.New("encryptedVote is required")
+	if len(encryptedVotesJSON) == 0 {
+		return errors.New("encryptedVotes is required")
 	}
 
 	election, err := c.getElection(ctx, electionID)
@@ -163,6 +162,21 @@ func (c *BallotContract) SubmitBallot(
 		return fmt.Errorf("election %q is not accepting ballots (phase %s)", electionID, election.Phase)
 	}
 
+	// Parse and validate per-candidate ciphertexts
+	var votes []string
+	if err := json.Unmarshal([]byte(encryptedVotesJSON), &votes); err != nil {
+		return fmt.Errorf("encryptedVotesJSON must be a JSON array of strings: %w", err)
+	}
+	if len(votes) != len(election.Candidates) {
+		return fmt.Errorf("expected %d encrypted votes, got %d", len(election.Candidates), len(votes))
+	}
+	for i, v := range votes {
+		if v == "" {
+			return fmt.Errorf("encrypted vote %d is empty", i)
+		}
+	}
+
+	// Reject duplicate ballot IDs
 	existing, err := ctx.GetStub().GetState(ballotKey(electionID, ballotID))
 	if err != nil {
 		return fmt.Errorf("failed to read ledger: %w", err)
@@ -171,6 +185,7 @@ func (c *BallotContract) SubmitBallot(
 		return fmt.Errorf("ballot %q already exists", ballotID)
 	}
 
+	// Reject spent tokens
 	spent, err := ctx.GetStub().GetState(tokenKey(electionID, tokenHash))
 	if err != nil {
 		return fmt.Errorf("failed to check token: %w", err)
@@ -181,18 +196,19 @@ func (c *BallotContract) SubmitBallot(
 
 	now, _ := getTxTimestamp(ctx)
 	ballot := Ballot{
-		BallotID:      ballotID,
-		ElectionID:    electionID,
-		EncryptedVote: encryptedVoteJSON,
-		TokenHash:     tokenHash,
-		CastAt:        now,
-		ChannelID:     ctx.GetStub().GetChannelID(),
+		BallotID:       ballotID,
+		ElectionID:     electionID,
+		EncryptedVotes: votes,
+		TokenHash:      tokenHash,
+		CastAt:         now,
+		ChannelID:      ctx.GetStub().GetChannelID(),
 	}
 
 	if err := ctx.GetStub().PutState(ballotKey(electionID, ballotID), mustMarshal(ballot)); err != nil {
 		return err
 	}
 
+	// Mark token as spent
 	token := TokenRecord{
 		TokenHash:  tokenHash,
 		ElectionID: electionID,
@@ -249,19 +265,35 @@ func (c *BallotContract) HasTokenBeenSpent(
 // TALLY
 
 // GetEncryptedTally computes the homomorphic sum of all ballots in an election.
+//
+// Returns one (C1, C2) pair per candidate. The chaincode does NOT decrypt
+// anything — the tally service will combine these with the threshold
+// decryption ceremony and ZK proofs to publish a verifiable result.
+//
+// Results are cached under encryptedTallyKey(electionID) once computed.
 func (c *BallotContract) GetEncryptedTally(
 	ctx contractapi.TransactionContextInterface,
 	electionID string,
-) (*EncryptedTally, error) {
-	if _, err := c.getElection(ctx, electionID); err != nil {
+) (*PerCandidateTally, error) {
+	election, err := c.getElection(ctx, electionID)
+	if err != nil {
 		return nil, err
 	}
 
-	if cached, err := ctx.GetStub().GetState(tallyKey(electionID)); err == nil && cached != nil {
-		var t EncryptedTally
+	// Return cached if present
+	if cached, err := ctx.GetStub().GetState(encryptedTallyKey(electionID)); err == nil && cached != nil {
+		var t PerCandidateTally
 		if err := json.Unmarshal(cached, &t); err == nil {
 			return &t, nil
 		}
+	}
+
+	numCandidates := len(election.Candidates)
+	sumC1 := make([]*big.Int, numCandidates)
+	sumC2 := make([]*big.Int, numCandidates)
+	for i := 0; i < numCandidates; i++ {
+		sumC1[i] = big.NewInt(1)
+		sumC2[i] = big.NewInt(1)
 	}
 
 	iterator, err := ctx.GetStub().GetStateByRange(
@@ -273,10 +305,7 @@ func (c *BallotContract) GetEncryptedTally(
 	}
 	defer iterator.Close()
 
-	sumC1 := big.NewInt(1)
-	sumC2 := big.NewInt(1)
 	var count int64
-
 	for iterator.HasNext() {
 		entry, err := iterator.Next()
 		if err != nil {
@@ -286,26 +315,38 @@ func (c *BallotContract) GetEncryptedTally(
 		if err := json.Unmarshal(entry.Value, &b); err != nil {
 			return nil, fmt.Errorf("corrupt ballot record: %w", err)
 		}
-
-		c1, c2, err := parseCiphertext([]byte(b.EncryptedVote))
-		if err != nil {
-			return nil, fmt.Errorf("ballot %s: %w", b.BallotID, err)
+		if len(b.EncryptedVotes) != numCandidates {
+			return nil, fmt.Errorf("ballot %s has %d votes, expected %d", b.BallotID, len(b.EncryptedVotes), numCandidates)
 		}
-		sumC1.Mul(sumC1, c1)
-		sumC2.Mul(sumC2, c2)
+		for i, v := range b.EncryptedVotes {
+			c1, c2, err := parseCiphertext([]byte(v))
+			if err != nil {
+				return nil, fmt.Errorf("ballot %s candidate %d: %w", b.BallotID, i, err)
+			}
+			sumC1[i].Mul(sumC1[i], c1)
+			sumC2[i].Mul(sumC2[i], c2)
+		}
 		count++
 	}
 
-	tally := EncryptedTally{
+	c1s := make([]string, numCandidates)
+	c2s := make([]string, numCandidates)
+	for i := 0; i < numCandidates; i++ {
+		c1s[i] = sumC1[i].String()
+		c2s[i] = sumC2[i].String()
+	}
+
+	tally := PerCandidateTally{
 		ElectionID:  electionID,
-		C1:          sumC1.String(),
-		C2:          sumC2.String(),
+		Candidates:  election.Candidates,
+		C1s:         c1s,
+		C2s:         c2s,
 		BallotCount: count,
 	}
 	now, _ := getTxTimestamp(ctx)
 	tally.ComputedAt = now
 
-	if err := ctx.GetStub().PutState(tallyKey(electionID), mustMarshal(tally)); err != nil {
+	if err := ctx.GetStub().PutState(encryptedTallyKey(electionID), mustMarshal(tally)); err != nil {
 		return nil, err
 	}
 	return &tally, nil
@@ -417,6 +458,41 @@ func (c *BallotContract) GetTally(
 		return nil, fmt.Errorf("corrupt tally record: %w", err)
 	}
 	return &t, nil
+}
+
+// GetAllBallots returns all ballots for an election. For 10-100 ballots this
+// is fine; for large elections it would need pagination.
+func (c *BallotContract) GetAllBallots(
+	ctx contractapi.TransactionContextInterface,
+	electionID string,
+) ([]Ballot, error) {
+	// Verify election exists
+	if _, err := c.getElection(ctx, electionID); err != nil {
+		return nil, err
+	}
+
+	iterator, err := ctx.GetStub().GetStateByRange(
+		ballotKey(electionID, ""),
+		ballotKey(electionID, "~"),
+	)
+	if err != nil {
+		return nil, fmt.Errorf("failed to iterate ballots: %w", err)
+	}
+	defer iterator.Close()
+
+	var ballots []Ballot
+	for iterator.HasNext() {
+		entry, err := iterator.Next()
+		if err != nil {
+			return nil, fmt.Errorf("iterator error: %w", err)
+		}
+		var b Ballot
+		if err := json.Unmarshal(entry.Value, &b); err != nil {
+			return nil, fmt.Errorf("corrupt ballot record: %w", err)
+		}
+		ballots = append(ballots, b)
+	}
+	return ballots, nil
 }
 
 /*
