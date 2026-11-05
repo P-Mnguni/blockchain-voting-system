@@ -6,6 +6,7 @@ import (
 	"math/big"
 	"os"
 	"path/filepath"
+	"time"
 
 	"github.com/blockchain-voting-system/pkg/crypto/elgamal"
 	"github.com/blockchain-voting-system/pkg/crypto/shamir"
@@ -27,6 +28,15 @@ type Result struct {
 	KeyholderIDs []string
 	Threshold    int
 	Total        int
+}
+
+// CeremonyMetadata is written to ceremony.json alongside the shares.
+// It records the threshold and total so the tally service knows how many
+// shares are required to reconstruct.
+type CeremonyMetadata struct {
+	Threshold int   `json:"threshold"`
+	Total     int   `json:"total"`
+	CreatedAt int64 `json:"createdAt"`
 }
 
 // RunTrustedDealer generates an ElGamal keypair, splits the private scalar into
@@ -94,6 +104,20 @@ func RunTrustedDealer(cfg Config) (*Result, error) {
 	// so we just drop the reference. The GC will collect it eventually.
 	// In production, this would use a secure-memory library.
 	_ = sk
+
+	// 6. Write ceremony metadata (threshold, total, timestamp)
+	meta := CeremonyMetadata{
+		Threshold: cfg.Threshold,
+		Total:     cfg.Total,
+		CreatedAt: time.Now().Unix(),
+	}
+	metaJSON, err := json.MarshalIndent(meta, "", "  ")
+	if err != nil {
+		return nil, fmt.Errorf("marshal ceremony metadata: %w", err)
+	}
+	if err := os.WriteFile(filepath.Join(cfg.OutputDir, "ceremony.json"), metaJSON, 0o644); err != nil {
+		return nil, fmt.Errorf("write ceremony metadata: %w", err)
+	}
 
 	return &Result{
 		PublicKey:    &sk.PublicKey,
@@ -166,6 +190,19 @@ func ReconstructPrivateKey(sharePaths []string, passphrases []string, outputLen 
 		PublicKey: elgamal.PublicKey{}, // caller sets this
 		X:         scalar,
 	}, nil
+}
+
+// LoadCeremonyMetadata reads ceremony.json from the given directory.
+func LoadCeremonyMetadata(dir string) (*CeremonyMetadata, error) {
+	data, err := os.ReadFile(filepath.Join(dir, "ceremony.json"))
+	if err != nil {
+		return nil, fmt.Errorf("read ceremony metadata: %w", err)
+	}
+	var meta CeremonyMetadata
+	if err := json.Unmarshal(data, &meta); err != nil {
+		return nil, fmt.Errorf("parse ceremony metadata: %w", err)
+	}
+	return &meta, nil
 }
 
 // helpers

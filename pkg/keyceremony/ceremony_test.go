@@ -157,5 +157,33 @@ func TestRunTrustedDealerInvalidConfig(t *testing.T) {
 	}
 }
 
+func TestCeremonyMetadataWritten(t *testing.T) {
+	dir := t.TempDir()
+	_, err := RunTrustedDealer(Config{
+		OutputDir:        dir,
+		Threshold:        3,
+		Total:            5,
+		KeySizeBits:      1024,
+		PassphrasePrefix: "test-pass-",
+	})
+	if err != nil {
+		t.Fatalf("RunTrustedDealer failed: %v", err)
+	}
+
+	meta, err := LoadCeremonyMetadata(dir)
+	if err != nil {
+		t.Fatalf("LoadCeremonyMetadata failed: %v", err)
+	}
+	if meta.Threshold != 3 {
+		t.Errorf("threshold: got %d, want 3", meta.Threshold)
+	}
+	if meta.Total != 5 {
+		t.Errorf("total: got %d, want 5", meta.Total)
+	}
+	if meta.CreatedAt == 0 {
+		t.Error("createdAt should be set")
+	}
+}
+
 // Silence unused-import warnings if elgamal isn't used elsewhere.
 var _ = elgamal.PublicKey{}
