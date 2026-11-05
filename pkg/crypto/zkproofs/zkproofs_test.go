@@ -102,8 +102,7 @@ func BenchmarkGenerateDecryptionProof(b *testing.B) {
 	ct, _ := sk.EncryptVote(1)
 	m := new(big.Int).Exp(sk.G, big.NewInt(1), sk.P)
 
-	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
+	for b.Loop() {
 		GenerateDecryptionProof(ct.C1, ct.C2, m, sk.Y, sk.P, sk.G, sk.X)
 	}
 }
@@ -114,8 +113,7 @@ func BenchmarkVerifyDecryptionProof(b *testing.B) {
 	m := new(big.Int).Exp(sk.G, big.NewInt(1), sk.P)
 	proof, _ := GenerateDecryptionProof(ct.C1, ct.C2, m, sk.Y, sk.P, sk.G, sk.X)
 
-	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
+	for b.Loop() {
 		VerifyDecryptionProof(ct.C1, ct.C2, m, sk.Y, sk.P, sk.G, proof)
 	}
 }

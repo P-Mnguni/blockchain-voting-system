@@ -218,8 +218,7 @@ func TestDecryptVoteDiagnostic(t *testing.T) {
 
 func BenchmarkEncryptVote(b *testing.B) {
 	sk, _ := NewElGamal(2048)
-	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
+	for b.Loop() {
 		sk.EncryptVote(1)
 	}
 }
@@ -227,8 +226,7 @@ func BenchmarkEncryptVote(b *testing.B) {
 func BenchmarkDecryptVote(b *testing.B) {
 	sk, _ := NewElGamal(2048)
 	ct, _ := sk.EncryptVote(1)
-	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
+	for b.Loop() {
 		sk.DecryptVote(ct, 100)
 	}
 }
@@ -239,8 +237,7 @@ func BenchmarkAddMany(b *testing.B) {
 	for i := 0; i < 100; i++ {
 		ciphertexts[i], _ = sk.EncryptVote(1)
 	}
-	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
+	for b.Loop() {
 		AddMany(ciphertexts, sk.P)
 	}
 }
