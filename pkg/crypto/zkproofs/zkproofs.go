@@ -3,7 +3,9 @@ package zkproofs
 import (
 	"crypto/rand"
 	"crypto/sha256"
+	"encoding/json"
 	"errors"
+	"fmt"
 	"math/big"
 )
 
@@ -165,4 +167,46 @@ func VerifyTallyProof(
 	}
 
 	return true
+}
+
+// MarshalJSON serializes the proof with big.Int fields as decimal strings.
+func (p *DecryptionProof) MarshalJSON() ([]byte, error) {
+	type raw struct {
+		A string `json:"A"`
+		B string `json:"B"`
+		S string `json:"S"`
+	}
+	return json.Marshal(raw{
+		A: p.A.String(),
+		B: p.B.String(),
+		S: p.S.String(),
+	})
+}
+
+// UnmarshalJSON parses a proof with big.Int fields from decimal strings.
+func (p *DecryptionProof) UnmarshalJSON(data []byte) error {
+	var raw struct {
+		A string `json:"A"`
+		B string `json:"B"`
+		S string `json:"S"`
+	}
+	if err := json.Unmarshal(data, &raw); err != nil {
+		return err
+	}
+	a, ok := new(big.Int).SetString(raw.A, 10)
+	if !ok {
+		return fmt.Errorf("invalid A")
+	}
+	b, ok := new(big.Int).SetString(raw.B, 10)
+	if !ok {
+		return fmt.Errorf("invalid B")
+	}
+	s, ok := new(big.Int).SetString(raw.S, 10)
+	if !ok {
+		return fmt.Errorf("invalid S")
+	}
+	p.A = a
+	p.B = b
+	p.S = s
+	return nil
 }
