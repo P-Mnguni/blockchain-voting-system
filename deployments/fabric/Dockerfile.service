@@ -1,4 +1,6 @@
 # syntax=docker/dockerfile:1.6
+
+# Pin to the same major.minor as go.mod and the test-runner image.
 FROM golang:1.27 AS builder
 
 WORKDIR /src
@@ -6,13 +8,15 @@ COPY go.mod go.sum ./
 RUN go mod download
 
 COPY . .
-RUN CGO_ENABLED=0 go build -trimpath -ldflags="-s -w" -o /out/voting-service ./cmd/voting-service
+ARG SERVICE=voting-service
+RUN CGO_ENABLED=0 go build -trimpath -ldflags="-s -w" -o /out/service ./cmd/${SERVICE}
 
+# Runtime base: Ubuntu LTS, minimal, gets security patches for 5+ years.
 FROM ubuntu:24.04
 RUN apt-get update \
     && apt-get install -y --no-install-recommends ca-certificates \
     && rm -rf /var/lib/apt/lists/*
 
-COPY --from=builder /out/voting-service /voting-service
+COPY --from=builder /out/service /service
 
-ENTRYPOINT ["/voting-service"]
+ENTRYPOINT ["/service"]
