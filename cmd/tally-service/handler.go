@@ -33,7 +33,7 @@ func (h *Handler) Tally(w http.ResponseWriter, r *http.Request) {
 
 	switch r.Method {
 	case http.MethodPost:
-		h.runCeremony(w, electionID)
+		h.runCeremony(w, r, electionID) // ← pass r
 	case http.MethodGet:
 		h.getResult(w, electionID)
 	default:
@@ -41,12 +41,25 @@ func (h *Handler) Tally(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-func (h *Handler) runCeremony(w http.ResponseWriter, electionID string) {
-	log.Printf("[tally-service] running ceremony for election %q", electionID)
+func (h *Handler) runCeremony(w http.ResponseWriter, r *http.Request, electionID string) {
+	// Optional request body: {"ceremonyDir": "/ceremony/test-123"}
+	var req struct {
+		CeremonyDir string `json:"ceremonyDir"`
+	}
+	if r.Body != nil && r.ContentLength > 0 {
+		_ = json.NewDecoder(r.Body).Decode(&req)
+	}
+
+	ceremonyDir := h.CeremonyDir
+	if req.CeremonyDir != "" {
+		ceremonyDir = req.CeremonyDir
+	}
+
+	log.Printf("[tally-service] running ceremony for election %q (ceremonyDir=%s)", electionID, ceremonyDir)
 
 	cfg := tally.Config{
 		ElectionID:       electionID,
-		CeremonyDir:      h.CeremonyDir,
+		CeremonyDir:      ceremonyDir,
 		PassphrasePrefix: h.PassphrasePrefix,
 		Fabric:           h.Fabric,
 	}
@@ -64,7 +77,7 @@ func (h *Handler) runCeremony(w http.ResponseWriter, electionID string) {
 		return
 	}
 
-	writeJSON(w, http.StatusOK, toJSONResponse(result))
+	writeJSON(w, http.StatusOK, result)
 }
 
 func (h *Handler) getResult(w http.ResponseWriter, electionID string) {
