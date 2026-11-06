@@ -1,6 +1,9 @@
 package identity
 
-import "strings"
+import (
+	"fmt"
+	"strings"
+)
 
 // EIDProvider verifies a voter's national electronic ID.
 // In production this calls the national eID service; for Milestone 3 we use
@@ -14,15 +17,15 @@ type MockEID struct {
 	Valid map[string]bool
 }
 
-// NewMockEID returns a mock provider pre-seeded with demo voter IDs.
+// NewMockEID returns a mock provider pre-seeded with 50 demo voter IDs
+// (voter-001 through voter-050). Enough to drive integration tests that
+// need many distinct ballots.
 func NewMockEID() *MockEID {
-	return &MockEID{
-		Valid: map[string]bool{
-			"voter-001": true,
-			"voter-002": true,
-			"voter-003": true,
-		},
+	valid := make(map[string]bool, 50)
+	for i := 1; i <= 50; i++ {
+		valid[fmt.Sprintf("voter-%03d", i)] = true
 	}
+	return &MockEID{Valid: valid}
 }
 
 func (m *MockEID) Verify(voterID string) error {
