@@ -5,9 +5,11 @@ import (
 	"sync"
 )
 
-// MockClient is an in-memory Client for unit tests. Submit and Evaluate are
-// backed by user-provided functions, so each test can define its own ledger
-// behavior.
+/*
+MockClient is an in-memory Client for unit tests. Submit and Evaluate are
+backed by user-provided functions, so each test can define its own ledger
+behavior.
+*/
 type MockClient struct {
 	mu       sync.Mutex
 	SubmitFn func(fn string, args ...string) ([]byte, error)

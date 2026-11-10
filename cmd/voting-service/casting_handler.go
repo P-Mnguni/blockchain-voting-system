@@ -50,7 +50,7 @@ func (h *CastingHandler) Cast(w http.ResponseWriter, r *http.Request) {
 			writeError(w, http.StatusForbidden, msg)
 		} else {
 			log.Printf("[casting] Cast failed: %v", err)
-    			writeError(w, http.StatusInternalServerError, "cast failed: "+msg)
+			writeError(w, http.StatusInternalServerError, "cast failed: "+msg)
 		}
 		return
 	}
@@ -69,8 +69,10 @@ func (h *CastingHandler) Healthz(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
-// isClientError decides whether an error should map to 4xx (client's fault)
-// or 5xx (server's fault).
+/*
+isClientError decides whether an error should map to 4xx (client's fault)
+or 5xx (server's fault).
+*/
 func isClientError(msg string) bool {
 	for _, s := range []string{
 		"expired",

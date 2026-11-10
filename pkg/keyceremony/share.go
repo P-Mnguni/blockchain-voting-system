@@ -18,12 +18,12 @@ import (
 
 // ShareRecord is the on-disk representation of an encrypted keyholder share.
 type ShareRecord struct {
-	KeyholderID string `json:"keyholderId"` // e.g. "keyholder-1"
-	KDF         string `json:"kdf"`         // "pbkdf2-sha256"
-	Iterations  int    `json:"iterations"`  // e.g. 100000
-	Salt        []byte `json:"salt"`        // 16 bytes
-	Nonce       []byte `json:"nonce"`       // 12 bytes (AES-GCM)
-	Ciphertext  []byte `json:"ciphertext"`  // encrypted share payload
+	KeyholderID string `json:"keyholderId"`
+	KDF         string `json:"kdf"`
+	Iterations  int    `json:"iterations"`
+	Salt        []byte `json:"salt"`
+	Nonce       []byte `json:"nonce"`
+	Ciphertext  []byte `json:"ciphertext"`
 }
 
 // sharePlaintext is what we actually encrypt.
@@ -90,8 +90,10 @@ func SaveShare(path, keyholderID, passphrase string, share shamir.Share, outputL
 		return fmt.Errorf("marshal record: %w", err)
 	}
 
-	// Write to a temp file with restrictive mode, then rename.
-	// This avoids partial writes and ensures permissions.
+	/*
+		Write to a temp file with restrictive mode, then rename.
+		Avoids partial writes and ensures permissions.
+	*/
 	tmpPath := path + ".tmp"
 	if err := os.WriteFile(tmpPath, data, 0o600); err != nil {
 		return fmt.Errorf("write temp share: %w", err)

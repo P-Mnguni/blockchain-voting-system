@@ -21,8 +21,10 @@ type Client struct {
 	CastingURL  string
 	HTTPClient  *http.Client
 
-	// ElectionPubKey is the homomorphic public key used to encrypt ballots.
-	// The client must obtain this from the election metadata before calling Cast.
+	/*
+		ElectionPubKey is the homomorphic public key used to encrypt ballots.
+		The client must obtain this from the election metadata before calling Cast.
+	*/
 	ElectionPubKey *elgamal.PublicKey
 }
 
@@ -77,11 +79,13 @@ func (c *Client) Register(voterID, electionID string) (*RegisterResponse, error)
 	return &resp, nil
 }
 
-// Cast encrypts one vote per candidate (each 0 or 1), then submits to the
-// casting service. votes[i] is the vote for election.Candidates[i].
-//
-// Exactly one entry should be 1 (for the chosen candidate) and the rest 0.
-// The client validates this before sending.
+/*
+Cast encrypts one vote per candidate (each 0 or 1), then submits to the
+casting service. votes[i] is the vote for election.Candidates[i].
+
+Exactly one entry should be 1 (for the chosen candidate) and the rest 0.
+The client validates this before sending.
+*/
 func (c *Client) Cast(electionID, credential string, votes []int64) (*Receipt, error) {
 	if c.CastingURL == "" {
 		return nil, fmt.Errorf("casting URL not set")
@@ -179,10 +183,12 @@ func (c *Client) postJSON(url string, body interface{}) ([]byte, int, error) {
 	return raw, resp.StatusCode, nil
 }
 
-// marshalCiphertext serializes an ElGamal ciphertext as a JSON object with
-// decimal-string fields. Uses a local struct rather than the elgamal.Ciphertext
-// directly because big.Int marshals as a string of digits but we want explicit
-// decimal strings for the chaincode.
+/*
+marshalCiphertext serializes an ElGamal ciphertext as a JSON object with
+decimal-string fields. Uses a local struct rather than the elgamal.Ciphertext
+directly because big.Int marshals as a string of digits but we want explicit
+decimal strings for the chaincode.
+*/
 func marshalCiphertext(ct *elgamal.Ciphertext) (string, error) {
 	if ct == nil || ct.C1 == nil || ct.C2 == nil {
 		return "", fmt.Errorf("ciphertext is nil")
@@ -197,8 +203,10 @@ func marshalCiphertext(ct *elgamal.Ciphertext) (string, error) {
 	return string(b), nil
 }
 
-// SerializePublicKey encodes a public key as JSON, for storing in the
-// election's homomorphicPubKey field.
+/*
+SerializePublicKey encodes a public key as JSON, for storing in the
+election's homomorphicPubKey field.
+*/
 func SerializePublicKey(pk *elgamal.PublicKey) (string, error) {
 	if pk == nil || pk.G == nil || pk.P == nil || pk.Y == nil {
 		return "", fmt.Errorf("public key is nil")

@@ -26,11 +26,13 @@ type Election struct {
 	FrozenAt          int64         `json:"frozenAt.omitempty"`
 }
 
-// Ballot is an encrypted vote as stored on the ledger.
-//
-// EncryptedVotes is one ciphertext per candidate, in the same order as
-// Election.Candidates. A vote for candidate i is encrypted as Enc(1) at
-// position i and Enc(0) at all other positions.
+/*
+Ballot is an encrypted vote as stored on the ledger.
+
+EncryptedVotes is one ciphertext per candidate, in the same order as
+Election.Candidates. A vote for candidate i is encrypted as Enc(1) at
+position i and Enc(0) at all other positions.
+*/
 type Ballot struct {
 	BallotID       string   `json:"ballotId"`
 	ElectionID     string   `json:"electionId"`
@@ -47,14 +49,16 @@ type TokenRecord struct {
 	SpentAt    int64  `json:"spentAt"`
 }
 
-// PerCandidateTally is the homomorphic sum per candidate for an election.
-// C1s and C2s are the two components of each candidate's accumulated ElGamal
-// ciphertext, stored as decimal strings.
+/*
+PerCandidateTally is the homomorphic sum per candidate for an election.
+C1s and C2s are the two components of each candidate's accumulated ElGamal
+ciphertext, stored as decimal strings.
+*/
 type PerCandidateTally struct {
 	ElectionID  string   `json:"electionId"`
-	Candidates  []string `json:"candidates"` // same order as Election.Candidates
-	C1s         []string `json:"c1s"`        // one per candidate
-	C2s         []string `json:"c2s"`        // one per candidate
+	Candidates  []string `json:"candidates"`
+	C1s         []string `json:"c1s"`
+	C2s         []string `json:"c2s"`
 	BallotCount int64    `json:"ballotCount"`
 	ComputedAt  int64    `json:"computedAt"`
 }
@@ -90,16 +94,20 @@ func mustMarshal(v interface{}) []byte {
 	return b
 }
 
-// CandidateResult is one candidate's decrypted total plus the ZK proof that
-// decryption was correct.
+/*
+CandidateResult is one candidate's decrypted total plus the ZK proof that
+decryption was correct.
+*/
 type CandidateResult struct {
 	Candidate string `json:"candidate"`
 	Sum       int64  `json:"sum"`
-	Proof     string `json:"proof"` // JSON-serialized zkproofs.DecryptionProof
+	Proof     string `json:"proof"`
 }
 
-// TallyResult is the published, decrypted tally for an election.
-// Written to the ledger after the threshold decryption ceremony.
+/*
+TallyResult is the published, decrypted tally for an election.
+Written to the ledger after the threshold decryption ceremony.
+*/
 type TallyResult struct {
 	ElectionID       string            `json:"electionId"`
 	CandidateResults []CandidateResult `json:"candidateResults"`

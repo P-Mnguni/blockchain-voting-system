@@ -6,8 +6,6 @@ import (
 )
 
 // EIDProvider verifies a voter's national electronic ID.
-// In production this calls the national eID service; for Milestone 3 we use
-// MockEID.
 type EIDProvider interface {
 	Verify(voterID string) error
 }
@@ -17,9 +15,10 @@ type MockEID struct {
 	Valid map[string]bool
 }
 
-// NewMockEID returns a mock provider pre-seeded with 50 demo voter IDs
-// (voter-001 through voter-050). Enough to drive integration tests that
-// need many distinct ballots.
+/*
+NewMockEID returns a mock provider pre-seeded with 50 demo voter IDs
+(voter-001 through voter-050).
+*/
 func NewMockEID() *MockEID {
 	valid := make(map[string]bool, 50)
 	for i := 1; i <= 50; i++ {

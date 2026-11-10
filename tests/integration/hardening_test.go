@@ -395,8 +395,7 @@ func TestDecryptionProofWrongPlaintext(t *testing.T) {
 // CROSS-PRIMITIVE: FULL END-TO-END PATH WITH SERIALIZATION
 
 /*
-TestFullPipelineWithSerialization walks through the entire crypto pipeline
-as Milestone 2 will actually use it:
+TestFullPipelineWithSerialization walks through the entire crypto pipeline:
 register → sign → encrypt → serialization → sum → decrypt → prove → verify
 */
 func TestFullPipelineWithSerialization(t *testing.T) {

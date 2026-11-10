@@ -21,9 +21,9 @@ import (
 // Config controls a single tally run.
 type Config struct {
 	ElectionID       string
-	CeremonyDir      string // directory with keyholder shares + publickey.json + ceremony.json
-	PassphrasePrefix string // e.g. "dev-keyholder-"
-	MaxSum           int64  // optional; defaults to ballotCount
+	CeremonyDir      string
+	PassphrasePrefix string
+	MaxSum           int64
 
 	// Fabric client for chaincode interaction
 	Fabric fabricclient.Client
@@ -32,14 +32,16 @@ type Config struct {
 // Service orchestrates tally runs.
 type Service struct{}
 
-// Run executes the full ceremony for an election:
-//  1. Fetch encrypted tally from chaincode
-//  2. Load ceremony metadata + public key
-//  3. Load keyholder shares
-//  4. Reconstruct private key
-//  5. Decrypt per-candidate sums
-//  6. Generate ZK proofs
-//  7. Publish result to chaincode
+/*
+Run executes the full ceremony for an election:
+ 1. Fetch encrypted tally from chaincode
+ 2. Load ceremony metadata + public key
+ 3. Load keyholder shares
+ 4. Reconstruct private key
+ 5. Decrypt per-candidate sums
+ 6. Generate ZK proofs
+ 7. Publish result to chaincode
+*/
 func (s *Service) Run(cfg Config) (*Result, error) {
 	if err := validateConfig(cfg); err != nil {
 		return nil, err
@@ -76,7 +78,7 @@ func (s *Service) Run(cfg Config) (*Result, error) {
 	if len(sharePaths) < meta.Threshold {
 		return nil, fmt.Errorf("need %d shares, found %d", meta.Threshold, len(sharePaths))
 	}
-	sharePaths = sharePaths[:meta.Threshold] // use exactly threshold
+	sharePaths = sharePaths[:meta.Threshold]
 	passphrases := make([]string, len(sharePaths))
 	for i := range sharePaths {
 		passphrases[i] = cfg.PassphrasePrefix + keyholderIDFromPath(sharePaths[i])

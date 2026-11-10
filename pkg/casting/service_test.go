@@ -123,7 +123,7 @@ func TestCastRejectsExpiredCredential(t *testing.T) {
 		Issuer:        issuer,
 		EID:           identity.NewMockEID(),
 		Voters:        identity.NewMemoryVoterStore(),
-		CredentialTTL: -time.Hour, // already expired
+		CredentialTTL: -time.Hour,
 	}
 	resp, _ := svc.Register("voter-001", "election-2025")
 

@@ -194,7 +194,7 @@ func runServe(args []string) error {
 	if err != nil {
 		return err
 	}
-	// Don't defer close — server runs forever
+
 	v := &verifier.Verifier{Fabric: fab}
 
 	mux := http.NewServeMux()

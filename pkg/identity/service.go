@@ -11,10 +11,9 @@ import (
 
 // Service issues voting credentials.
 type Service struct {
-	Issuer *blind.BlindSignatureIssuer
-	EID    EIDProvider
-	Voters VoterStore
-	// CredentialTTL is how long an issued credential is valid. Defaults to 24h.
+	Issuer        *blind.BlindSignatureIssuer
+	EID           EIDProvider
+	Voters        VoterStore
 	CredentialTTL time.Duration
 }
 

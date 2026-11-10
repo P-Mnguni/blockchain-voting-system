@@ -11,14 +11,16 @@ import (
 	"github.com/blockchain-voting-system/pkg/crypto/sha256util"
 )
 
-// Credential is a self-verifying voting credential.
-//
-//	credential = base64(payload) + "." + hex(signature)
-//
-// where payload = voterIDHash(32) || electionIDHash(32) || expiry(8)
-//
-// The credential does not reveal the voterID (only its hash), so a leaked
-// credential cannot be used to deanonymize the voter.
+/*
+Credential is a self-verifying voting credential.
+
+credential = base64(payload) + "." + hex(signature)
+
+where payload = voterIDHash(32) || electionIDHash(32) || expiry(8)
+
+The credential does not reveal the voterID (only its hash), so a leaked
+credential cannot be used to deanonymize the voter.
+*/
 type Credential struct {
 	VoterIDHash    [32]byte
 	ElectionIDHash [32]byte
@@ -42,8 +44,10 @@ func (c *Credential) Encode() string {
 	return payload + "." + sig
 }
 
-// DecodeCredential parses a credential string. Does NOT verify the signature —
-// the caller must do that via Verify.
+/*
+DecodeCredential parses a credential string. Does NOT verify the signature —
+the caller must do that via Verify.
+*/
 func DecodeCredential(s string) (*Credential, error) {
 	dot := -1
 	for i := len(s) - 1; i >= 0; i-- {

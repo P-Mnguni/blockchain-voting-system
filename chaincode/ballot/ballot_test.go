@@ -25,8 +25,10 @@ type testTxContext struct {
 func (c *testTxContext) GetStub() shim.ChaincodeStubInterface  { return c.stub }
 func (c *testTxContext) GetClientIdentity() cid.ClientIdentity { return nil }
 
-// makeEncryptedVotes produces a JSON array of ciphertexts — one "C1,C2" pair
-// per candidate, in election candidate order.
+/*
+makeEncryptedVotes produces a JSON array of ciphertexts — one "C1,C2" pair
+per candidate, in election candidate order.
+*/
 func makeEncryptedVotes(pairs ...string) string {
 	var votes []string
 	for _, p := range pairs {
@@ -308,7 +310,6 @@ func TestGetEncryptedTallyCaches(t *testing.T) {
 		t.Fatalf("first tally failed: %v", err)
 	}
 
-	// Add another ballot — cached tally should NOT include it
 	must(t, c.SubmitBallot(ctx, "e1", "b2", makeEncryptedVotes("3,11", "5,7"), "t2"))
 
 	second, err := c.GetEncryptedTally(ctx, "e1")
@@ -336,7 +337,7 @@ func TestGetEncryptedTallyEmptyElection(t *testing.T) {
 	if tally.BallotCount != 0 {
 		t.Errorf("expected 0 ballots, got %d", tally.BallotCount)
 	}
-	// Both candidates should have identity ciphertext (1,1)
+
 	for i := 0; i < 2; i++ {
 		if tally.C1s[i] != "1" || tally.C2s[i] != "1" {
 			t.Errorf("candidate %d empty tally should be (1,1), got (%s,%s)", i, tally.C1s[i], tally.C2s[i])
@@ -362,7 +363,7 @@ func TestGetAllBallots(t *testing.T) {
 	if len(ballots) != 2 {
 		t.Errorf("expected 2 ballots, got %d", len(ballots))
 	}
-	// Verify each has 2 encrypted votes
+
 	for _, b := range ballots {
 		if len(b.EncryptedVotes) != 2 {
 			t.Errorf("ballot %s has %d votes, want 2", b.BallotID, len(b.EncryptedVotes))

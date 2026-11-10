@@ -33,9 +33,7 @@ func run() error {
 		return err
 	}
 
-	// One issuer shared by both services. This is why we run them in the same
-	// process for Milestone 3B — no key serialization needed. Milestone 4
-	// splits them with a proper key exchange.
+	// One issuer shared by both services.
 	issuer, err := blind.NewBlindSignatureIssuer(2048)
 	if err != nil {
 		return fmt.Errorf("create issuer: %w", err)

@@ -21,7 +21,7 @@ type Service struct {
 
 // CastRequest is the input to Cast.
 type CastRequest struct {
-	ElectionID      string // which election to cast into
+	ElectionID      string
 	EncryptedBallot string
 	Credential      string
 }

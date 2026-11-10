@@ -4,8 +4,10 @@ import (
 	"sync"
 )
 
-// VoterStore tracks which voters have already registered for which elections.
-// Prevents a voter from being issued a second credential for the same election.
+/*
+VoterStore tracks which voters have already registered for which elections.
+Prevents a voter from being issued a second credential for the same election.
+*/
 type VoterStore interface {
 	// MarkRegistered records that voterID has registered for electionID.
 	// Returns an error if the voter is already registered for this election.
@@ -17,7 +19,7 @@ type VoterStore interface {
 // MemoryVoterStore is an in-memory VoterStore.
 type MemoryVoterStore struct {
 	mu      sync.Mutex
-	entries map[string]bool // key: electionID + "\x00" + voterID
+	entries map[string]bool
 }
 
 func NewMemoryVoterStore() *MemoryVoterStore {

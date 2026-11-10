@@ -43,13 +43,15 @@ type Verifier struct {
 	Fabric Client
 }
 
-// VerifyTally performs the full verification:
-//  1. Fetch the published tally result from the chaincode
-//  2. Fetch the encrypted tally (the source of truth for sums)
-//  3. For each candidate:
-//     a. Verify the ZK proof: ciphertext decrypts to g^sum
-//     b. (Optional) Recompute from raw ballots and check it matches the
-//     on-chain encrypted tally
+/*
+VerifyTally performs the full verification:
+ 1. Fetch the published tally result from the chaincode
+ 2. Fetch the encrypted tally (the source of truth for sums)
+ 3. For each candidate:
+    a. Verify the ZK proof: ciphertext decrypts to g^sum
+    b. (Optional) Recompute from raw ballots and check it matches the
+    on-chain encrypted tally
+*/
 func (v *Verifier) VerifyTally(electionID string) (*Result, error) {
 	if v.Fabric == nil {
 		return nil, fmt.Errorf("fabric client is required")
@@ -182,8 +184,10 @@ func (v *Verifier) VerifyTally(electionID string) (*Result, error) {
 	return res, nil
 }
 
-// VerifyBallot confirms that a specific ballot exists on the ledger and
-// returns its encrypted votes.
+/*
+VerifyBallot confirms that a specific ballot exists on the ledger and
+returns its encrypted votes.
+*/
 func (v *Verifier) VerifyBallot(electionID, ballotID string) (*BallotVerification, error) {
 	if v.Fabric == nil {
 		return nil, fmt.Errorf("fabric client is required")
@@ -268,8 +272,10 @@ func (v *Verifier) getPublicKey(electionID string) (*publicKey, error) {
 	return &publicKey{G: g, P: p, Y: y}, nil
 }
 
-// recomputeAndCompare fetches all ballots, sums their ciphertexts per candidate,
-// and compares against the expected C1s/C2s.
+/*
+recomputeAndCompare fetches all ballots, sums their ciphertexts per candidate,
+and compares against the expected C1s/C2s.
+*/
 func (v *Verifier) recomputeAndCompare(electionID string, expectedC1s, expectedC2s []string) (bool, error) {
 	raw, err := v.Fabric.Evaluate("GetAllBallots", electionID)
 	if err != nil {

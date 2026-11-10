@@ -36,7 +36,7 @@ func (p *Provisioner) ProvisionElection(electionID string) error {
 		electionID,
 		"Integration Test Election",
 		candidatesJSON,
-		"placeholder-homomorphic-pubkey", // signature only; tests don't decrypt
+		"placeholder-homomorphic-pubkey",
 	)
 	if err != nil {
 		return fmt.Errorf("RegisterElection: %w", err)

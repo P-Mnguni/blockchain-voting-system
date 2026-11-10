@@ -9,8 +9,10 @@ import (
 	"math/big"
 )
 
-// ProofOfCorrectDecryption proves that a ciphertext was correctly decrypted
-// without revealing the decryption key or the plaintext
+/*
+	ProofOfCorrectDecryption proves that a ciphertext was correctly decrypted
+	without revealing the decryption key or the plaintext
+*/
 
 type DecryptionProof struct {
 	A *big.Int

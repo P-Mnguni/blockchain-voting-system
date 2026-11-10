@@ -150,8 +150,6 @@ func TestVerifyTallySuccess(t *testing.T) {
 	if !res.ProofsVerified {
 		t.Errorf("proofs should be verified: %v", res.Errors)
 	}
-	// Note: ciphertextMatch may be false here because the mock doesn't cache
-	// the sum — it re-encrypts randomly. In production this is deterministic.
 }
 
 func TestVerifyTallyRejectsMissingElection(t *testing.T) {

@@ -10,6 +10,21 @@ This repository is being built incrementally.
 **Milestone 4 (Tally Service & Public Verifier) is in progress.
 
 ---
+## War Stories
+
+This project hit and fixed 20+ non-obvious issues across the milestones.
+The full list is in [deployments/fabric/README.md](deployments/fabric/README.md#gotchas--lessons-learned).
+
+The most interesting:
+
+- **The Silent Upgrade** — a chaincode upgrade appeared to work but kept
+  running the old code. Two hours of debugging led to a one-line fix in
+  the package ID resolution.
+- **The Memory Wall** — chaincode installs kept timing out until we
+  realized old dev-peer containers were eating RAM.
+- **The Schema Rejection** — a nullable struct field silently broke every
+  E2E test with a cryptic validation error.
+
 
 ## Milestone 1 - Cryptographic Foundation ✅
 
@@ -323,6 +338,104 @@ test/services/
 
 └── helpers.go
 
+## Milestone 4 — Tally Service & Public Verifier ✅
+
+The half of the system that makes the votes count: threshold decryption
+and public verification. This is where the architecture doc's trust model
+becomes real.
+
+### What's Included
+
+#### Threshold Key Ceremony — `pkg/keyceremony/`
+- Trusted dealer generates an ElGamal keypair
+- Private scalar is split into N shares via Shamir (threshold-of-total)
+- Each share is encrypted with AES-GCM (PBKDF2-SHA256-derived key)
+- `ceremony.json` records threshold, total, timestamp
+- Production replaces the trusted dealer with a real DKG ceremony
+
+#### Chaincode Tally Functions — `chaincode/ballot/` (v1.5)
+- `PublishTally`: writes per-candidate results + ZK proofs to the ledger
+- `GetTally`: retrieves the published result
+- `GetEncryptedTally`: per-candidate homomorphic sum
+- `GetAllBallots`: enumerates ballots for verification
+
+#### Tally Service — `pkg/tally/` + `cmd/tally-service/`
+Full ceremony orchestration:
+1. Fetch encrypted tally from chaincode
+2. Load keyholder shares from disk
+3. Reconstruct private key from threshold shares
+4. Decrypt per-candidate sums
+5. Generate Chaum-Pedersen proof per candidate
+6. Publish result + proofs via `PublishTally`
+
+HTTP API: `POST /tally/{electionID}`, `GET /tally/{electionID}`
+
+#### Public Verifier — `pkg/verifier/` + `cmd/verifier/`
+Stateless, key-free verification:
+- Fetches election + tally + encrypted ciphertexts from ledger
+- Verifies each ZK proof against the on-chain ciphertext
+- Recomputation: fetches all ballots, sums them, compares to on-chain tally
+- Ballot lookup: confirms a specific voter receipt is on the ledger
+
+CLI: `verifier tally --election=X`, `verifier ballot --election=X --ballot-id=Y`
+Web: `verifier serve --port=8090` (minimal HTML UI)
+
+### Why It Matters
+
+The verifier uses **no secret keys**. Anyone can run it and independently
+confirm the election result. That's the trust property:
+
+> No single party can decrypt votes. Anyone can verify the result.
+
+### Testing
+
+```bash
+# Ceremony + tally unit tests
+go test ./pkg/keyceremony/... ./pkg/tally/... ./pkg/verifier/... -v
+
+# Full E2E (requires network + services)
+docker exec -it fabric-test-runner bash
+cd /work
+IDENTITY_URL=http://voting-service:8080 \
+CASTING_URL=http://voting-service:8081 \
+TALLY_URL=http://tally-service:8082 \
+# ... (other FABRIC_* env vars)
+go test ./test/tally/... -v -count=1
+```
+
+### Layout
+pkg/
+
+├── keyceremony/       # Trusted dealer + share storage
+
+├── tally/             # Ceremony orchestration
+
+└── verifier/          # Public verification logic
+
+cmd/
+
+├── tally-service/     # HTTP wrapper around pkg/tally
+
+└── verifier/          # CLI + web UI
+
+test/tally/            # Full E2E test
+
+### Demo
+```
+=== Election tally-test-1793980625502831325 ===
+Phase: TALLIED
+Ballots cast: 15
+
+Per-candidate results:
+  ✓ Alice        sum=10
+  ✓ Bob          sum=5
+
+Proofs verified: ✓
+Ciphertext match: ✓
+
+=== VERIFIED ===
+```
+
 ### Status 
 
 Pre-production: Do not use for real elections. Independent security audit required
@@ -335,7 +448,7 @@ before any deployment
 - [x] **Milestone 1** — Cryptographic foundation
 - [x] **Milestone 2** — Fabric chaincode + dev network
 - [x] **Milestone 3** — Identity & casting services 
-- [ ] **Milestone 4** — Tally & public verifier portal (in progress)
+- [x] **Milestone 4** — Tally & public verifier portal (in progress)
 - [ ] **Milestone 5** — Production readiness (scale, HSM, audit)
 ```
 

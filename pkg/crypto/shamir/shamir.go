@@ -23,7 +23,7 @@ func Split(secret []byte, n, threshold int) ([]Share, error) {
 		return nil, errors.New("secret cannot be empty")
 	}
 
-	shares := make([]Share, n) // For simplicity, using GF(256)
+	shares := make([]Share, n)
 
 	coeffs := make([][]byte, threshold)
 	coeffs[0] = make([]byte, len(secret))

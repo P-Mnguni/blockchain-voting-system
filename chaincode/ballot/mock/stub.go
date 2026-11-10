@@ -16,8 +16,10 @@ import (
 // Compile-time check: Stub must satisfy the Fabric interface.
 var _ shim.ChaincodeStubInterface = (*Stub)(nil)
 
-// Stub is a minimal in-memory stub. Only methods used by BallotContract
-// behave meaningfully; the rest return zero values or panic.
+/*
+Stub is a minimal in-memory stub. Only methods used by BallotContract
+behave meaningfully; the rest return zero values or panic.
+*/
 type Stub struct {
 	mu        sync.Mutex
 	state     map[string][]byte
@@ -153,9 +155,11 @@ func (it *rangeIterator) Next() (*queryresult.KV, error) {
 }
 
 // --- methods not used by BallotContract ---
-// We return zero values rather than panic so tests that don't exercise
-// these paths still run. If you want to be stricter, replace with panics.
 
+/*
+return zero values rather than panic so tests that don't exercise
+these paths still run.
+*/
 func (s *Stub) GetArgs() [][]byte                            { return nil }
 func (s *Stub) GetStringArgs() []string                      { return nil }
 func (s *Stub) GetFunctionAndParameters() (string, []string) { return "", nil }

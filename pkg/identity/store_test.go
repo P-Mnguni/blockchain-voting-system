@@ -51,8 +51,7 @@ func TestMemoryVoterStoreConcurrent(t *testing.T) {
 		}()
 	}
 	wg.Wait()
-	// Exactly one should have succeeded; we can't easily check which, but at
-	// least the store should not have crashed and the entry exists.
+
 	if !s.IsRegistered("v1", "e1") {
 		t.Error("v1 should be registered")
 	}

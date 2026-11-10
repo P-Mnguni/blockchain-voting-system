@@ -140,7 +140,7 @@ func TestLoadShareUnsupportedKDF(t *testing.T) {
 
 	record := ShareRecord{
 		KeyholderID: "kh-1",
-		KDF:         "argon2id", // not what we support
+		KDF:         "argon2id",
 		Iterations:  1,
 		Salt:        make([]byte, 16),
 		Nonce:       make([]byte, 12),
@@ -178,7 +178,7 @@ func TestLoadShareTamperedCiphertext(t *testing.T) {
 	if err := json.Unmarshal(data, &record); err != nil {
 		t.Fatalf("unmarshal failed: %v", err)
 	}
-	record.Ciphertext[0] ^= 0xFF // flip a bit
+	record.Ciphertext[0] ^= 0xFF
 	tampered, _ := json.Marshal(record)
 	if err := os.WriteFile(path, tampered, 0o600); err != nil {
 		t.Fatalf("write failed: %v", err)

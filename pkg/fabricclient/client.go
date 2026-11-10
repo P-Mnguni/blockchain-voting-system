@@ -1,6 +1,6 @@
 // Package fabricclient is a thin wrapper around the Hyperledger Fabric Gateway
 // SDK. It exposes just what the identity and casting services need: submit a
-// transaction, evaluate a transaction. Nothing more.
+// transaction, evaluate a transaction.
 package fabricclient
 
 import (
@@ -25,14 +25,14 @@ type Client interface {
 // Config holds everything needed to connect to a Fabric peer via the Gateway SDK.
 type Config struct {
 	MSPID         string
-	PeerEndpoint  string // host:port
-	PeerHostname  string // TLS server name (matches cert SAN)
+	PeerEndpoint  string
+	PeerHostname  string
 	TLSCACertPath string
 	CertPath      string
 	KeyPath       string
 	ChannelName   string
 	ChaincodeName string
-	Timeout       time.Duration // optional, defaults to 30s
+	Timeout       time.Duration
 }
 
 // gatewayClient is the real implementation.

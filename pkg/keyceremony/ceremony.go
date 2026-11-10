@@ -14,11 +14,11 @@ import (
 
 // Config controls a single trusted-dealer ceremony.
 type Config struct {
-	OutputDir        string // where to write shares + public key
-	Threshold        int    // e.g. 5
-	Total            int    // e.g. 9
-	KeySizeBits      int    // e.g. 2048
-	PassphrasePrefix string // e.g. "dev-keyholder-" — each share gets prefix + N
+	OutputDir        string
+	Threshold        int
+	Total            int
+	KeySizeBits      int
+	PassphrasePrefix string
 }
 
 // Result describes what the ceremony produced.
@@ -30,20 +30,24 @@ type Result struct {
 	Total        int
 }
 
-// CeremonyMetadata is written to ceremony.json alongside the shares.
-// It records the threshold and total so the tally service knows how many
-// shares are required to reconstruct.
+/*
+CeremonyMetadata is written to ceremony.json alongside the shares.
+It records the threshold and total so the tally service knows how many
+shares are required to reconstruct.
+*/
 type CeremonyMetadata struct {
 	Threshold int   `json:"threshold"`
 	Total     int   `json:"total"`
 	CreatedAt int64 `json:"createdAt"`
 }
 
-// RunTrustedDealer generates an ElGamal keypair, splits the private scalar into
-// shares, encrypts them, and writes everything to disk.
-//
-// The private key exists in this process's memory only transiently. After Run
-// returns, the caller has no access to it.
+/*
+RunTrustedDealer generates an ElGamal keypair, splits the private scalar into
+shares, encrypts them, and writes everything to disk.
+
+The private key exists in this process's memory only transiently. After Run
+returns, the caller has no access to it.
+*/
 func RunTrustedDealer(cfg Config) (*Result, error) {
 	if cfg.OutputDir == "" {
 		return nil, fmt.Errorf("output directory is required")
@@ -102,7 +106,6 @@ func RunTrustedDealer(cfg Config) (*Result, error) {
 	// 5. Wipe the private key from memory (as best Go allows).
 	// Zeroing sk.X's internal bytes is not straightforward with big.Int,
 	// so we just drop the reference. The GC will collect it eventually.
-	// In production, this would use a secure-memory library.
 	_ = sk
 
 	// 6. Write ceremony metadata (threshold, total, timestamp)
@@ -162,8 +165,10 @@ func LoadPublicKey(path string) (*elgamal.PublicKey, error) {
 	return &elgamal.PublicKey{G: g, P: p, Y: y}, nil
 }
 
-// ReconstructPrivateKey loads the given shares and reconstructs the original
-// ElGamal private key. Used during the tally ceremony.
+/*
+ReconstructPrivateKey loads the given shares and reconstructs the original
+ElGamal private key. Used during the tally ceremony.
+*/
 func ReconstructPrivateKey(sharePaths []string, passphrases []string, outputLen int) (*elgamal.PrivateKey, error) {
 	if len(sharePaths) != len(passphrases) {
 		return nil, fmt.Errorf("shares and passphrases must have same length")
@@ -187,7 +192,7 @@ func ReconstructPrivateKey(sharePaths []string, passphrases []string, outputLen 
 	}
 
 	return &elgamal.PrivateKey{
-		PublicKey: elgamal.PublicKey{}, // caller sets this
+		PublicKey: elgamal.PublicKey{},
 		X:         scalar,
 	}, nil
 }

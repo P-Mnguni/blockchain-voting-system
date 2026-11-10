@@ -20,10 +20,12 @@ type Handler struct {
 	PassphrasePrefix string
 }
 
-// Tally handles both POST and GET for /tally/{electionID}.
-//
-//	POST /tally/{id} — run the full ceremony and publish the result
-//	GET  /tally/{id} — fetch the published result from the chaincode
+/*
+Tally handles both POST and GET for /tally/{electionID}.
+
+POST /tally/{id} — run the full ceremony and publish the result
+GET  /tally/{id} — fetch the published result from the chaincode
+*/
 func (h *Handler) Tally(w http.ResponseWriter, r *http.Request) {
 	electionID := strings.TrimPrefix(r.URL.Path, "/tally/")
 	if electionID == "" || strings.Contains(electionID, "/") {
@@ -33,7 +35,7 @@ func (h *Handler) Tally(w http.ResponseWriter, r *http.Request) {
 
 	switch r.Method {
 	case http.MethodPost:
-		h.runCeremony(w, r, electionID) // ← pass r
+		h.runCeremony(w, r, electionID)
 	case http.MethodGet:
 		h.getResult(w, electionID)
 	default:
@@ -42,7 +44,6 @@ func (h *Handler) Tally(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *Handler) runCeremony(w http.ResponseWriter, r *http.Request, electionID string) {
-	// Optional request body: {"ceremonyDir": "/ceremony/test-123"}
 	var req struct {
 		CeremonyDir string `json:"ceremonyDir"`
 	}
@@ -102,15 +103,19 @@ func (h *Handler) Healthz(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
-// toJSONResponse converts tally.Result into a JSON-friendly shape.
-// The zkproofs.DecryptionProof has custom JSON marshaling that serializes
-// big.Int fields as decimal strings, so it round-trips cleanly.
+/*
+toJSONResponse converts tally.Result into a JSON-friendly shape.
+The zkproofs.DecryptionProof has custom JSON marshaling that serializes
+big.Int fields as decimal strings, so it round-trips cleanly.
+*/
 func toJSONResponse(r *tally.Result) interface{} {
 	return r
 }
 
-// isClientError decides whether an error should map to 4xx (client's fault)
-// or 5xx (server's fault).
+/*
+isClientError decides whether an error should map to 4xx (client's fault)
+or 5xx (server's fault).
+*/
 func isClientError(msg string) bool {
 	for _, s := range []string{
 		"required",

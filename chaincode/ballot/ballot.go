@@ -135,11 +135,13 @@ func (c *BallotContract) getElection(
 
 // BALLOT OPERATIONS
 
-// SubmitBallot casts a vote. Requirements:
-//   - election must exist and be in VOTING phase
-//   - the token hash must not already be spent in this election
-//   - ballotID must not collide with an existing ballot
-//   - encryptedVotesJSON must be a JSON array with exactly one entry per candidate
+/*
+SubmitBallot casts a vote. Requirements:
+  - election must exist and be in VOTING phase
+  - the token hash must not already be spent in this election
+  - ballotID must not collide with an existing ballot
+  - encryptedVotesJSON must be a JSON array with exactly one entry per candidate
+*/
 func (c *BallotContract) SubmitBallot(
 	ctx contractapi.TransactionContextInterface,
 	electionID string,
@@ -264,13 +266,11 @@ func (c *BallotContract) HasTokenBeenSpent(
 
 // TALLY
 
-// GetEncryptedTally computes the homomorphic sum of all ballots in an election.
-//
-// Returns one (C1, C2) pair per candidate. The chaincode does NOT decrypt
-// anything — the tally service will combine these with the threshold
-// decryption ceremony and ZK proofs to publish a verifiable result.
-//
-// Results are cached under encryptedTallyKey(electionID) once computed.
+/*
+GetEncryptedTally computes the homomorphic sum of all ballots in an election.
+Returns one (C1, C2) pair per candidate.
+Results are cached under encryptedTallyKey(electionID) once computed.
+*/
 func (c *BallotContract) GetEncryptedTally(
 	ctx contractapi.TransactionContextInterface,
 	electionID string,
@@ -352,13 +352,13 @@ func (c *BallotContract) GetEncryptedTally(
 	return &tally, nil
 }
 
-// PublishTally writes the decrypted per-candidate sums and ZK proofs to the
-// ledger. Only valid when the election is FROZEN (polls closed, results not
-// yet published). Once published, the election transitions to TALLIED.
-//
-// The caller must provide one proof per candidate. These proofs, together with
-// the encrypted tally already on-chain, let anyone verify that the decrypted
-// sums are correct.
+/*
+	PublishTally writes the decrypted per-candidate sums and ZK proofs to the
+	ledger. Only valid when the election is FROZEN (polls closed, results not
+	yet published). Once published, the election transitions to TALLIED.
+*/
+
+// The caller must provide one proof per candidate.
 func (c *BallotContract) PublishTally(
 	ctx contractapi.TransactionContextInterface,
 	electionID string,
@@ -440,8 +440,10 @@ func (c *BallotContract) PublishTally(
 	return nil
 }
 
-// GetTally returns the published tally result for an election, or an error if
-// the tally hasn't been published yet.
+/*
+GetTally returns the published tally result for an election, or an error if
+the tally hasn't been published yet.
+*/
 func (c *BallotContract) GetTally(
 	ctx contractapi.TransactionContextInterface,
 	electionID string,
@@ -460,8 +462,7 @@ func (c *BallotContract) GetTally(
 	return &t, nil
 }
 
-// GetAllBallots returns all ballots for an election. For 10-100 ballots this
-// is fine; for large elections it would need pagination.
+// GetAllBallots returns all ballots for an election.
 func (c *BallotContract) GetAllBallots(
 	ctx contractapi.TransactionContextInterface,
 	electionID string,
@@ -497,7 +498,6 @@ func (c *BallotContract) GetAllBallots(
 
 /*
 parseCiphertext extracts (C1, C2) from a JSON-serialized ciphertext
-Expected to look like {"C1": <bigint-string>, "C2": <bigint-string>}
 */
 func parseCiphertext(blob []byte) (*big.Int, *big.Int, error) {
 	var raw struct {

@@ -10,8 +10,10 @@ import (
 	"github.com/blockchain-voting-system/pkg/keyceremony"
 )
 
-// setupCeremony generates a ceremony and casts N encrypted ballots via a mock
-// fabric client, then returns everything the tally service needs.
+/*
+setupCeremony generates a ceremony and casts N encrypted ballots via a mock
+fabric client, then returns everything the tally service needs.
+*/
 func setupCeremony(t *testing.T) (cfg Config, fab *fabricclient.MockClient) {
 	t.Helper()
 

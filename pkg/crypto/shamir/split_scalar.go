@@ -5,10 +5,12 @@ import (
 	"math/big"
 )
 
-// SplitScalar splits a big.Int into shares over GF(256) by first encoding the
-// scalar into fixed-length big-endian bytes.
-//
-// The scalar must be non-negative. Shares reconstruct the exact same scalar.
+/*
+SplitScalar splits a big.Int into shares over GF(256) by first encoding the
+scalar into fixed-length big-endian bytes.
+
+The scalar must be non-negative. Shares reconstruct the exact same scalar.
+*/
 func SplitScalar(scalar *big.Int, n, threshold int) ([]Share, int, error) {
 	if scalar == nil {
 		return nil, 0, fmt.Errorf("scalar is nil")
@@ -18,9 +20,6 @@ func SplitScalar(scalar *big.Int, n, threshold int) ([]Share, int, error) {
 	}
 
 	// Pad to a fixed length so every share has the same size.
-	// We use the scalar's byte length plus one byte of headroom for safety
-	// (avoids the edge case where the top byte is 0 and dropping it would
-	// change reconstruction behavior).
 	raw := scalar.Bytes()
 	if len(raw) == 0 {
 		raw = []byte{0}
@@ -36,7 +35,6 @@ func SplitScalar(scalar *big.Int, n, threshold int) ([]Share, int, error) {
 }
 
 // CombineScalar reconstructs a big.Int from shares produced by SplitScalar.
-// The outputLen is the original padded length returned by SplitScalar.
 func CombineScalar(shares []Share, outputLen int) (*big.Int, error) {
 	combined, err := Combine(shares)
 	if err != nil {

@@ -54,14 +54,14 @@ func run() error {
 	}
 
 	mux := http.NewServeMux()
-	mux.HandleFunc("/tally/", handler.Tally) // POST /tally/{electionID}, GET /tally/{electionID}
+	mux.HandleFunc("/tally/", handler.Tally)
 	mux.HandleFunc("/healthz", handler.Healthz)
 
 	srv := &http.Server{
 		Addr:         ":" + cfg.Port,
 		Handler:      mux,
 		ReadTimeout:  10 * time.Second,
-		WriteTimeout: 300 * time.Second, // tally ceremony can take minutes
+		WriteTimeout: 300 * time.Second,
 	}
 
 	stop := make(chan os.Signal, 1)
