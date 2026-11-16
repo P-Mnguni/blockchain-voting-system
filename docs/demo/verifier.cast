@@ -1,0 +1,7 @@
+{"version": 2, "width": 68, "height": 24, "timestamp": 1794849848, "env": {"SHELL": "/bin/bash", "TERM": "xterm-256color"}}
+[0.013978, "o", "\u001b[H\u001b[2J\u001b[3J"]
+[0.015061, "o", "=== Election Verifier ===\r\nIndependent, stateless, key-free.\r\n\r\n"]
+[2.019279, "o", "$ verifier tally --election=tally-test-1794849171702572136\r\n"]
+[2.019353, "o", "\r\n"]
+[3.342101, "o", "\r\n=== Election tally-test-1794849171702572136 ===\r\nPhase: TALLIED\r\nBallots cast: 15\r\n\r\nPer-candidate results:\r\n  ✓ Alice        sum=10\r\n  ✓ Bob          sum=5\r\n\r\nProofs verified: ✓\r\nCiphertext match: ✓\r\n\r\n=== VERIFIED ===\r\n"]
+[6.365255, "o", "\r\nNo private key. No trusted party. Just public ledger data + ZK proofs.\r\n"]
