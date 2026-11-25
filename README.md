@@ -25,6 +25,34 @@ The most interesting:
 - **The Schema Rejection** — a nullable struct field silently broke every
   E2E test with a cryptic validation error.
 
+## Demo
+
+**End-to-end verifiable voting — in three acts.**
+
+### The result
+
+A public verifier confirms an election result from the ledger alone. No secret
+key, no trusted party — just the on-chain ciphertexts and zero-knowledge proofs.
+
+![Independent verification](docs/demo/verifier.gif)
+
+### The network
+
+A 4-org Hyperledger Fabric network — Electoral Commission, two political
+parties, and the judiciary. Every transaction requires endorsement from a
+majority of the orgs. No single organization can act alone.
+
+![Fabric network overview](docs/demo/network-overview.gif)
+
+### The mechanism
+
+Encrypted ballots are homomorphically summed. A 3-of-5 threshold ceremony
+decrypts only the aggregate, generates a ZK proof per candidate, and publishes
+the result on-chain.
+
+![Tally ceremony](docs/demo/tally-ceremony2.gif)
+
+**Run it yourself:** see [`docs/demo/`](docs/demo/) for the scripts.
 
 ## Milestone 1 - Cryptographic Foundation ✅
 

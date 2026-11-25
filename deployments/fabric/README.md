@@ -451,6 +451,24 @@ client.WithCommitStatusTimeout(120 * time.Second),
 commit status error: rpc error: code = DeadlineExceeded desc = context deadline exceeded
 ```
 
+#### 22. Host-side tools can't read root-owned crypto material
+
+Cryptogen runs in a container as root, so it creates `crypto-config/` with
+root-owned files. Tools that run on the host (like the `verifier` CLI, or
+any `go run` that reads the user's cert/key) fail with:
+
+```bash
+read user key: open .../keystore/priv_sk: permission denied
+```
+
+
+**Fix:** After any cryptogen run, or if a host-side tool fails to read the
+crypto files:
+
+```bash
+sudo chown -R $USER:$USER deployments/fabric/crypto-config
+```
+
 ### Summary Table
 
 | # | Category | Symptom |
@@ -475,4 +493,5 @@ commit status error: rpc error: code = DeadlineExceeded desc = context deadline 
 | 18 | Filesystem | `go build ./...` fails on ceremony dir |
 | 19 | Testing | Permission tests pass on Linux, fail on Windows |
 | 20 | gRPC | `name resolver error` or `no such host`
-| 21 | gRPC | `DeadlineExceeded` on commit
+| 21 | gRPC | `DeadlineExceeded` on commit |
+| 22 | Filesystem | Host tools fail to read `crypto-config/` files |
