@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"math/big"
+	"os"
 	"testing"
 	"time"
 
@@ -67,6 +68,15 @@ func TestTallyEndToEnd(t *testing.T) {
 	// 5. Freeze the election
 	fab.Submit(t, "FreezeElection", electionID)
 	t.Log("election frozen")
+
+	// Demo hook: stop after freeze so a fresh FROZEN election can be tallied
+	// live during a recording. Not used by CI.
+	if os.Getenv("SKIP_TALLY") == "1" {
+		t.Logf("SKIP_TALLY=1: election frozen, ready for demo")
+		t.Logf("ELECTION_ID=%s", electionID)
+		t.Logf("CEREMONY_DIR=%s", ContainerCeremonyDir(runID))
+		return
+	}
 
 	// 6. Run the tally ceremony via HTTP
 	tallyHTTP := NewHTTPClient(tallyURL)
