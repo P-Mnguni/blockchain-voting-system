@@ -147,7 +147,7 @@ func runVerboseTally(v *verifier.Verifier, electionID string) error {
 		os.Exit(2)
 	}
 	for i, c := range encTally.Candidates {
-		fmt.Printf("      %s: C1=%s...  C2=%s...\n",
+		fmt.Printf("      %s: C1=%s  C2=%s\n",
 			c, truncate(encTally.C1s[i], 16), truncate(encTally.C2s[i], 16))
 	}
 	fmt.Printf("      elapsed: %s\n\n", time.Since(stepStart).Round(time.Millisecond))
