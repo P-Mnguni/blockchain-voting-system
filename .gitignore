@@ -14,3 +14,4 @@ deployments/fabric/crypto-config/
 deployments/fabric/channel-artifacts/chaincode-build/
 chaincode-build/
 docs/demo/*.cast
+deployments/fabric/ceremony/
