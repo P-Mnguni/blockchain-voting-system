@@ -9,6 +9,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"math/big"
+	"time"
 
 	"github.com/blockchain-voting-system/pkg/crypto/zkproofs"
 	"github.com/blockchain-voting-system/pkg/fabricclient"
@@ -36,6 +37,13 @@ type CandidateResult struct {
 	Sum             int64  `json:"sum"`
 	ProofValid      bool   `json:"proofValid"`
 	VerificationErr string `json:"verificationErr,omitempty"`
+}
+
+// ElectionInfo is a minimal view of an election for verbose output.
+type ElectionInfo struct {
+	ElectionID string   `json:"electionId"`
+	Phase      string   `json:"phase"`
+	Candidates []string `json:"candidates"`
 }
 
 // Verifier performs election verification against a Fabric client.
@@ -227,6 +235,226 @@ type BallotVerification struct {
 	EncryptedVotes []string `json:"encryptedVotes"`
 	CastAt         int64    `json:"castAt"`
 	Found          bool     `json:"found"`
+}
+
+// FetchElection fetches election metadata.
+func (v *Verifier) FetchElection(electionID string) (*ElectionInfo, error) {
+	raw, err := v.Fabric.Evaluate("GetElection", electionID)
+	if err != nil {
+		return nil, fmt.Errorf("fetch election: %w", err)
+	}
+	var e ElectionInfo
+	if err := json.Unmarshal(raw, &e); err != nil {
+		return nil, fmt.Errorf("parse election: %w", err)
+	}
+	return &e, nil
+}
+
+// PublishedTally is a minimal view of the published tally.
+type PublishedTally struct {
+	ElectionID       string
+	TotalBallots     int64
+	CandidateResults []PublishedCandidate
+}
+
+type PublishedCandidate struct {
+	Candidate string
+	Sum       int64
+	ProofJSON string
+}
+
+// FetchPublishedTally fetches the published tally from the chain.
+func (v *Verifier) FetchPublishedTally(electionID string) (*PublishedTally, error) {
+	raw, err := v.Fabric.Evaluate("GetTally", electionID)
+	if err != nil {
+		return nil, fmt.Errorf("fetch tally: %w", err)
+	}
+	var t struct {
+		ElectionID       string `json:"electionId"`
+		CandidateResults []struct {
+			Candidate string `json:"candidate"`
+			Sum       int64  `json:"sum"`
+			Proof     string `json:"proof"`
+		} `json:"candidateResults"`
+		TotalBallots int64 `json:"totalBallots"`
+	}
+	if err := json.Unmarshal(raw, &t); err != nil {
+		return nil, fmt.Errorf("parse tally: %w", err)
+	}
+	out := &PublishedTally{
+		ElectionID:   t.ElectionID,
+		TotalBallots: t.TotalBallots,
+	}
+	for _, c := range t.CandidateResults {
+		out.CandidateResults = append(out.CandidateResults, PublishedCandidate{
+			Candidate: c.Candidate,
+			Sum:       c.Sum,
+			ProofJSON: c.Proof,
+		})
+	}
+	return out, nil
+}
+
+// EncryptedTallyView is a minimal view of the encrypted tally.
+type EncryptedTallyView struct {
+	Candidates []string
+	C1s        []string
+	C2s        []string
+}
+
+// FetchEncryptedTally fetches the on-chain ciphertext.
+func (v *Verifier) FetchEncryptedTally(electionID string) (*EncryptedTallyView, error) {
+	raw, err := v.Fabric.Evaluate("GetEncryptedTally", electionID)
+	if err != nil {
+		return nil, fmt.Errorf("fetch encrypted tally: %w", err)
+	}
+	var e EncryptedTallyView
+	if err := json.Unmarshal(raw, &e); err != nil {
+		return nil, fmt.Errorf("parse encrypted tally: %w", err)
+	}
+	return &e, nil
+}
+
+// ProofVerification is the result of verifying one candidate's proof.
+type ProofVerification struct {
+	Candidate string
+	Sum       int64
+	Valid     bool
+	Duration  time.Duration
+	Error     string
+}
+
+// VerifyProofs verifies each candidate's ZK proof.
+func (v *Verifier) VerifyProofs(electionID string) ([]ProofVerification, error) {
+	tally, err := v.FetchPublishedTally(electionID)
+	if err != nil {
+		return nil, err
+	}
+	enc, err := v.FetchEncryptedTally(electionID)
+	if err != nil {
+		return nil, err
+	}
+	pk, err := v.getPublicKey(electionID)
+	if err != nil {
+		return nil, err
+	}
+
+	var results []ProofVerification
+	for i, cr := range tally.CandidateResults {
+		pv := ProofVerification{Candidate: cr.Candidate, Sum: cr.Sum}
+		start := time.Now()
+
+		if i >= len(enc.C1s) || i >= len(enc.C2s) {
+			pv.Valid = false
+			pv.Error = "missing ciphertext"
+			pv.Duration = time.Since(start)
+			results = append(results, pv)
+			continue
+		}
+
+		c1, ok1 := new(big.Int).SetString(enc.C1s[i], 10)
+		c2, ok2 := new(big.Int).SetString(enc.C2s[i], 10)
+		if !ok1 || !ok2 {
+			pv.Valid = false
+			pv.Error = "invalid ciphertext encoding"
+			pv.Duration = time.Since(start)
+			results = append(results, pv)
+			continue
+		}
+
+		var proof zkproofs.DecryptionProof
+		if err := json.Unmarshal([]byte(cr.ProofJSON), &proof); err != nil {
+			pv.Valid = false
+			pv.Error = fmt.Sprintf("parse proof: %v", err)
+			pv.Duration = time.Since(start)
+			results = append(results, pv)
+			continue
+		}
+
+		m := new(big.Int).Exp(pk.G, big.NewInt(cr.Sum), pk.P)
+		pv.Valid = zkproofs.VerifyDecryptionProof(c1, c2, m, pk.Y, pk.P, pk.G, &proof)
+		pv.Duration = time.Since(start)
+		if !pv.Valid {
+			pv.Error = "proof does not verify"
+		}
+		results = append(results, pv)
+	}
+	return results, nil
+}
+
+// RecomputeResult is the result of recomputing the homomorphic sum.
+type RecomputeResult struct {
+	Matches    bool
+	Mismatches []string
+}
+
+// RecomputeTally fetches all ballots, sums their ciphertexts, and compares
+// against the on-chain encrypted tally.
+func (v *Verifier) RecomputeTally(electionID string) (*RecomputeResult, error) {
+	enc, err := v.FetchEncryptedTally(electionID)
+	if err != nil {
+		return nil, err
+	}
+	return v.recomputeAndCompareRecheck(electionID, enc.C1s, enc.C2s)
+}
+
+// recomputeAndCompareRecheck returns detailed mismatch info.
+func (v *Verifier) recomputeAndCompareRecheck(electionID string, expectedC1s, expectedC2s []string) (*RecomputeResult, error) {
+	raw, err := v.Fabric.Evaluate("GetAllBallots", electionID)
+	if err != nil {
+		return nil, fmt.Errorf("fetch ballots: %w", err)
+	}
+	var ballots []struct {
+		EncryptedVotes []string `json:"encryptedVotes"`
+	}
+	if err := json.Unmarshal(raw, &ballots); err != nil {
+		return nil, fmt.Errorf("parse ballots: %w", err)
+	}
+	if len(ballots) == 0 {
+		return &RecomputeResult{Matches: false, Mismatches: []string{"no ballots"}}, nil
+	}
+
+	num := len(expectedC1s)
+	sumC1 := make([]*big.Int, num)
+	sumC2 := make([]*big.Int, num)
+	for i := 0; i < num; i++ {
+		sumC1[i] = big.NewInt(1)
+		sumC2[i] = big.NewInt(1)
+	}
+	for _, b := range ballots {
+		if len(b.EncryptedVotes) != num {
+			return nil, fmt.Errorf("ballot has %d votes, expected %d", len(b.EncryptedVotes), num)
+		}
+		for i, vs := range b.EncryptedVotes {
+			var ct struct{ C1, C2 string }
+			if err := json.Unmarshal([]byte(vs), &ct); err != nil {
+				return nil, fmt.Errorf("parse ciphertext: %w", err)
+			}
+			c1, _ := new(big.Int).SetString(ct.C1, 10)
+			c2, _ := new(big.Int).SetString(ct.C2, 10)
+			if c1 != nil {
+				sumC1[i].Mul(sumC1[i], c1)
+			}
+			if c2 != nil {
+				sumC2[i].Mul(sumC2[i], c2)
+			}
+		}
+	}
+
+	res := &RecomputeResult{Matches: true}
+	for i := 0; i < num; i++ {
+		wantC1, _ := new(big.Int).SetString(expectedC1s[i], 10)
+		wantC2, _ := new(big.Int).SetString(expectedC2s[i], 10)
+		if wantC1 != nil && sumC1[i].Cmp(wantC1) != 0 {
+			res.Matches = false
+			res.Mismatches = append(res.Mismatches, fmt.Sprintf("candidate %d: C1 mismatch", i))
+		}
+		if wantC2 != nil && sumC2[i].Cmp(wantC2) != 0 {
+			res.Matches = false
+			res.Mismatches = append(res.Mismatches, fmt.Sprintf("candidate %d: C2 mismatch", i))
+		}
+	}
+	return res, nil
 }
 
 // --- internal helpers ---

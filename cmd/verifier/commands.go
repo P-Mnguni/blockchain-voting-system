@@ -49,12 +49,10 @@ func (f *fabricFlags) connect() (fabricclient.Client, error) {
 			return nil, fmt.Errorf("--%s is required", r.name)
 		}
 	}
-
 	hostname := f.hostname
 	if hostname == "" {
 		hostname = "peer0.electoralcommission.example.com"
 	}
-
 	return fabricclient.Connect(fabricclient.Config{
 		MSPID:         f.mspID,
 		PeerEndpoint:  f.endpoint,
@@ -70,6 +68,7 @@ func (f *fabricFlags) connect() (fabricclient.Client, error) {
 func runTally(args []string) error {
 	fs := flag.NewFlagSet("tally", flag.ExitOnError)
 	electionID := fs.String("election", "", "election ID")
+	verbose := fs.Bool("verbose", false, "show step-by-step verification detail")
 	var ff fabricFlags
 	ff.register(fs)
 
@@ -87,17 +86,136 @@ func runTally(args []string) error {
 	defer fab.Close()
 
 	v := &verifier.Verifier{Fabric: fab}
+
+	if *verbose {
+		return runVerboseTally(v, *electionID)
+	}
+
 	res, err := v.VerifyTally(*electionID)
 	if err != nil {
 		return err
 	}
-
 	printTallyResult(res)
 	if !res.ProofsVerified {
 		os.Exit(2)
 	}
 	return nil
 }
+
+// --- verbose mode ---
+
+func runVerboseTally(v *verifier.Verifier, electionID string) error {
+	start := time.Now()
+
+	fmt.Printf("Verifying election %s\n", electionID)
+	fmt.Printf("Stateless, read-only, no secret key.\n\n")
+
+	// Step 1: fetch election
+	stepStart := time.Now()
+	fmt.Printf("[1/5] Fetching election from ledger...\n")
+	election, err := v.FetchElection(electionID)
+	if err != nil {
+		fmt.Printf("      FAILED: %v\n", err)
+		fmt.Println("\n=== VERIFICATION FAILED ===")
+		os.Exit(2)
+	}
+	fmt.Printf("      OK  phase=%s  candidates=%d\n", election.Phase, len(election.Candidates))
+	fmt.Printf("      elapsed: %s\n\n", time.Since(stepStart).Round(time.Millisecond))
+
+	// Step 2: fetch published tally
+	stepStart = time.Now()
+	fmt.Printf("[2/5] Fetching published tally from chain...\n")
+	tally, err := v.FetchPublishedTally(electionID)
+	if err != nil {
+		fmt.Printf("      FAILED: %v\n", err)
+		fmt.Println("\n=== VERIFICATION FAILED ===")
+		os.Exit(2)
+	}
+	fmt.Printf("      OK  ballots=%d\n", tally.TotalBallots)
+	for _, r := range tally.CandidateResults {
+		fmt.Printf("      published: %s = %d\n", r.Candidate, r.Sum)
+	}
+	fmt.Printf("      elapsed: %s\n\n", time.Since(stepStart).Round(time.Millisecond))
+
+	// Step 3: fetch encrypted tally
+	stepStart = time.Now()
+	fmt.Printf("[3/5] Fetching encrypted tally ciphertext from chain...\n")
+	encTally, err := v.FetchEncryptedTally(electionID)
+	if err != nil {
+		fmt.Printf("      FAILED: %v\n", err)
+		fmt.Println("\n=== VERIFICATION FAILED ===")
+		os.Exit(2)
+	}
+	for i, c := range encTally.Candidates {
+		fmt.Printf("      %s: C1=%s...  C2=%s...\n",
+			c, truncate(encTally.C1s[i], 16), truncate(encTally.C2s[i], 16))
+	}
+	fmt.Printf("      elapsed: %s\n\n", time.Since(stepStart).Round(time.Millisecond))
+
+	// Step 4: verify ZK proofs
+	stepStart = time.Now()
+	fmt.Printf("[4/5] Verifying ZK proofs (Chaum-Pedersen)...\n")
+	proofResults, err := v.VerifyProofs(electionID)
+	if err != nil {
+		fmt.Printf("      FAILED: %v\n", err)
+		fmt.Println("\n=== VERIFICATION FAILED ===")
+		os.Exit(2)
+	}
+	allValid := true
+	for _, pr := range proofResults {
+		if pr.Valid {
+			fmt.Printf("      OK  %s: sum=%d  proof=VALID  (%s)\n",
+				pr.Candidate, pr.Sum, pr.Duration.Round(time.Microsecond))
+		} else {
+			fmt.Printf("      FAIL  %s: sum=%d  proof=INVALID  %s\n",
+				pr.Candidate, pr.Sum, pr.Error)
+			allValid = false
+		}
+	}
+	fmt.Printf("      elapsed: %s\n\n", time.Since(stepStart).Round(time.Millisecond))
+
+	// Step 5: recompute homomorphic sum
+	stepStart = time.Now()
+	fmt.Printf("[5/5] Recomputing homomorphic sum from raw ballots...\n")
+	recompute, err := v.RecomputeTally(electionID)
+	if err != nil {
+		fmt.Printf("      FAILED: %v\n", err)
+		fmt.Println("\n=== VERIFICATION FAILED ===")
+		os.Exit(2)
+	}
+	match := recompute.Matches
+	if match {
+		fmt.Printf("      OK  computed ciphertext matches on-chain tally\n")
+	} else {
+		fmt.Printf("      FAIL  computed ciphertext does NOT match on-chain tally\n")
+		for _, m := range recompute.Mismatches {
+			fmt.Printf("            %s\n", m)
+		}
+		allValid = false
+	}
+	fmt.Printf("      elapsed: %s\n\n", time.Since(stepStart).Round(time.Millisecond))
+
+	// Final
+	fmt.Printf("Total elapsed: %s\n\n", time.Since(start).Round(time.Millisecond))
+	if allValid && match {
+		fmt.Println("=== VERIFIED ===")
+		fmt.Println("No secret key. No trusted party. Just public ledger data + ZK proofs.")
+		return nil
+	}
+	fmt.Println("=== VERIFICATION FAILED ===")
+	os.Exit(2)
+	return nil
+}
+
+// truncate shows the first n chars of s, with an ellipsis if longer.
+func truncate(s string, n int) string {
+	if len(s) <= n {
+		return s
+	}
+	return s[:n] + "..."
+}
+
+// --- non-verbose output (existing) ---
 
 func printTallyResult(res *verifier.Result) {
 	fmt.Printf("\n=== Election %s ===\n", res.ElectionID)
@@ -125,7 +243,6 @@ func printTallyResult(res *verifier.Result) {
 			fmt.Printf("  - %s\n", e)
 		}
 	}
-
 	if res.ProofsVerified && res.CiphertextMatch {
 		fmt.Println("\n=== VERIFIED ===")
 	} else {
@@ -194,7 +311,6 @@ func runServe(args []string) error {
 	if err != nil {
 		return err
 	}
-
 	v := &verifier.Verifier{Fabric: fab}
 
 	mux := http.NewServeMux()
@@ -213,7 +329,6 @@ func runServe(args []string) error {
 		_ = json.NewEncoder(w).Encode(res)
 	})
 	mux.HandleFunc("/api/ballot/", func(w http.ResponseWriter, r *http.Request) {
-		// /api/ballot/{election}/{ballot}
 		parts := splitPath(r.URL.Path[len("/api/ballot/"):])
 		if len(parts) != 2 {
 			http.Error(w, "expected /api/ballot/{election}/{ballot}", 400)
