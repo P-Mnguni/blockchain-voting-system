@@ -27,7 +27,7 @@ The most interesting:
 
 ## Demo
 
-**End-to-end verifiable voting — in three acts.**
+**End-to-end verifiable voting — in three demonstrations.**
 
 ### The result
 
@@ -36,23 +36,43 @@ key, no trusted party — just the on-chain ciphertexts and zero-knowledge proof
 
 ![Independent verification](docs/demo/verifier.gif)
 
-### The network
+Every step is real: it fetches the election, the published tally, and the
+encrypted ciphertext from the chain; verifies each candidate's Chaum-Pedersen
+proof (with per-proof timing); recomputes the homomorphic sum from every raw
+ballot; and compares. Total elapsed: ~100ms for 15 ballots.
+
+### The detection
+
+The same verifier, run against a tampered election. Real ballots, real
+ciphertexts, real ZK proofs — but wrong published sums.
+
+![Tamper detection](docs/demo/tamper.gif)
+
+Both proofs fail verification, the verifier exits non-zero, and prints
+`=== VERIFICATION FAILED ===`. This is what makes the honest run meaningful:
+a verifier that can only print PASS is indistinguishable from `echo PASS`.
+This one catches lies.
+
+### The infrastructure
 
 A 4-org Hyperledger Fabric network — Electoral Commission, two political
-parties, and the judiciary. Every transaction requires endorsement from a
-majority of the orgs. No single organization can act alone.
+parties, and the judiciary. Block heights advance across all four peers in
+lockstep; a peer going offline doesn't stop the election; the offline peer
+re-synchronizes automatically when it returns.
 
-![Fabric network overview](docs/demo/network-overview.gif)
+![Network topology](docs/demo/network-topology.gif)
+
+Every transaction requires endorsement from a majority of the orgs. No single
+organization can unilaterally rewrite ledger state or forge endorsements.
 
 ### The mechanism
 
-Encrypted ballots are homomorphically summed. A 3-of-5 threshold ceremony
-decrypts only the aggregate, generates a ZK proof per candidate, and publishes
-the result on-chain.
+> **Coming in Milestone 5A:** the tally ceremony GIF will be re-recorded with
+> step-by-step progress once true threshold ElGamal decryption is implemented.
+> The current version shows the ceremony running but not each keyholder's
+> partial contribution.
 
-![Tally ceremony](docs/demo/tally-ceremony2.gif)
-
-**Run it yourself:** see [`docs/demo/`](docs/demo/) for the scripts.
+**Run the demos yourself:** see [`docs/demo/`](docs/demo/) for the scripts.
 
 ## Milestone 1 - Cryptographic Foundation ✅
 
@@ -464,6 +484,34 @@ Ciphertext match: ✓
 === VERIFIED ===
 ```
 
+### Prototype vs. production — known limitations
+
+Two properties are simplified in this prototype and tracked for Milestone 5:
+
+**1. Threshold reconstruction vs. threshold decryption.**
+In this prototype, the tally service combines 3-of-5 Shamir shares to
+reconstruct the full decryption key in memory during the ceremony, then
+decrypts the aggregate. A production system would use **true threshold
+ElGamal decryption**, where each keyholder computes a partial decryption
+with their own share and the partials are combined without ever assembling
+the full key. The current approach is honest about the trust model:
+compromise of the tally service *during the ceremony* would leak the key.
+Milestone 5A implements true threshold decryption.
+
+**2. No per-ballot range proofs.**
+The chaincode accepts any well-formed ciphertext as a ballot. A malicious
+voter could submit `Enc(999)` instead of `Enc(0)` or `Enc(1)`. The tally
+service catches this indirectly — `DecryptVote(ct, maxSum)` bounds the
+discrete-log search, so an outsized ballot causes decryption to fail. But a
+production system would add **per-ballot range proofs** (zero-knowledge
+proofs that each encrypted ballot is a valid vote), so malformed ballots
+are rejected at submission time. Milestone 5A implements these.
+
+Neither limitation affects the demo's core claims: the verifier genuinely
+verifies, tampering is genuinely detected, and the network genuinely
+requires multi-org endorsement. They affect the *production readiness* of
+the scheme, not its *demonstrated behavior*.
+
 ### Status 
 
 Pre-production: Do not use for real elections. Independent security audit required
@@ -476,8 +524,17 @@ before any deployment
 - [x] **Milestone 1** — Cryptographic foundation
 - [x] **Milestone 2** — Fabric chaincode + dev network
 - [x] **Milestone 3** — Identity & casting services 
-- [x] **Milestone 4** — Tally & public verifier portal (in progress)
+- [x] **Milestone 4** — Tally & public verifier portal
 - [ ] **Milestone 5** — Production readiness (scale, HSM, audit)
+  - [ ] **5A** — Cryptographic hardening
+    - True threshold ElGamal decryption
+    - Per-ballot range proofs
+    - Real distributed key generation (DKG)
+    - HSM-backed share storage
+  - [ ] **5B** — Infrastructure (BFT ordering, multi-node Raft, Kubernetes, load testing)
+  - [ ] **5C** — Operations (live ceremony UI, mTLS, audit channel)
+  - [ ] **5D** — Client-side security (real eID, mobile client, mixnet)
+  - [ ] **5E** — Assurance (security audit, formal verification)
 ```
 
 ### License

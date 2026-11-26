@@ -469,6 +469,49 @@ crypto files:
 sudo chown -R $USER:$USER deployments/fabric/crypto-config
 ```
 
+#### 23. `qscc.GetChainInfo` returns protobuf, not JSON
+
+The `qscc` system chaincode's `GetChainInfo` function returns a serialized
+protobuf blob. Running it via `peer chaincode query` prints raw binary to
+the terminal — garbage like `� �J��Q"�)^`.
+
+**Wrong:**
+```bash
+peer chaincode query -C electionchannel -n qscc \
+    -c '{"Args":["GetChainInfo","electionchannel"]}' | jq '.height'
+# jq: parse error: Invalid numeric literal
+```
+
+**Right:**
+```bash
+peer channel getinfo -c electionchannel
+# Blockchain info: {"height":523,"currentBlockHash":"...","previousBlockHash":"..."}
+```
+`peer channel getinfo` is a wrapper around the same call that decodes the
+protobuf and prints JSON. Use it for any script that needs block heights.
+
+#### 24. Root-owned ceremony directories block `go build ./...`
+
+When tests run inside the test-runner container (as root), they create
+`deployments/fabric/ceremony/<runid>/` directories owned by root. The next
+`go build ./...` on the host fails with:
+
+```bash
+pattern ./...: open deployments/fabric/ceremony/e2e-XXXX: permission denied
+```
+
+**Fix:**
+
+```bash
+sudo rm -rf deployments/fabric/ceremony/*/
+sudo chown $USER:$USER deployments/fabric/ceremony/
+```
+
+*Prevention:*
+
+Prevention: add a `make clean-ceremony` target, or remember to run the
+cleanup before any `go build ./...` if tests have been run recently.
+
 ### Summary Table
 
 | # | Category | Symptom |
@@ -495,3 +538,5 @@ sudo chown -R $USER:$USER deployments/fabric/crypto-config
 | 20 | gRPC | `name resolver error` or `no such host`
 | 21 | gRPC | `DeadlineExceeded` on commit |
 | 22 | Filesystem | Host tools fail to read `crypto-config/` files |
+| 23 | Fabric CLI | `jq: parse error` on `qscc.GetChainInfo` output |
+| 24 | Filesystem | `go build ./...` fails on root-owned ceremony directories |
