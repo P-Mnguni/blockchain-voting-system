@@ -15,16 +15,17 @@ CRYPTO=deployments/fabric/crypto-config/peerOrganizations/electoralcommission.ex
 
 clear
 echo "=== Election Verifier ==="
-echo "Independent, stateless, key-free."
+echo "Stateless. Read-only. No secret key."
 echo ""
 sleep 2
 
-echo "\$ verifier tally --election=$ELECTION_ID"
+echo "\$ verifier tally --election=$ELECTION_ID --verbose"
 echo ""
 sleep 1
 
 go run ./cmd/verifier tally \
     --election="$ELECTION_ID" \
+    --verbose \
     --msp-id=ElectoralCommissionMSP \
     --endpoint=localhost:7051 \
     --hostname=peer0.electoralcommission.example.com \
@@ -32,7 +33,7 @@ go run ./cmd/verifier tally \
     --cert=${CRYPTO}/users/Admin@electoralcommission.example.com/msp/signcerts/Admin@electoralcommission.example.com-cert.pem \
     --key=${CRYPTO}/users/Admin@electoralcommission.example.com/msp/keystore/priv_sk
 
-sleep 3
+sleep 4
 echo ""
-echo "No private key. No trusted party. Just public ledger data + ZK proofs."
-sleep 2
+echo "Anyone with the ledger can reproduce this verification."
+sleep 3

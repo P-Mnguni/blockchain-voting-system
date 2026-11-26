@@ -1,7 +1,11 @@
-{"version": 2, "width": 68, "height": 24, "timestamp": 1794849848, "env": {"SHELL": "/bin/bash", "TERM": "xterm-256color"}}
-[0.013978, "o", "\u001b[H\u001b[2J\u001b[3J"]
-[0.015061, "o", "=== Election Verifier ===\r\nIndependent, stateless, key-free.\r\n\r\n"]
-[2.019279, "o", "$ verifier tally --election=tally-test-1794849171702572136\r\n"]
-[2.019353, "o", "\r\n"]
-[3.342101, "o", "\r\n=== Election tally-test-1794849171702572136 ===\r\nPhase: TALLIED\r\nBallots cast: 15\r\n\r\nPer-candidate results:\r\n  ✓ Alice        sum=10\r\n  ✓ Bob          sum=5\r\n\r\nProofs verified: ✓\r\nCiphertext match: ✓\r\n\r\n=== VERIFIED ===\r\n"]
-[6.365255, "o", "\r\nNo private key. No trusted party. Just public ledger data + ZK proofs.\r\n"]
+{"version": 2, "width": 68, "height": 24, "timestamp": 1795707505, "env": {"SHELL": "/bin/bash", "TERM": "xterm-256color"}}
+[0.014113, "o", "\u001b[H\u001b[2J\u001b[3J"]
+[0.015436, "o", "=== Election Verifier ===\r\nStateless. Read-only. No secret key.\r\n\r\n"]
+[2.018905, "o", "$ verifier tally --election=tally-test-1795705913570544086 --verbose\r\n\r\n"]
+[3.254568, "o", "Verifying election tally-test-1795705913570544086\r\nStateless, read-only, no secret key.\r\n\r\n[1/5] Fetching election from ledger...\r\n"]
+[3.275214, "o", "      OK  phase=TALLIED  candidates=2\r\n      elapsed: 13ms\r\n\r\n[2/5] Fetching published tally from chain...\r\n      OK  ballots=15\r\n      published: Alice = 10\r\n      published: Bob = 5\r\n      elapsed: 5ms\r\n\r\n[3/5] Fetching encrypted tally ciphertext from chain...\r\n"]
+[3.291693, "o", "      Alice: C1=1386322915110690...  C2=7770933531782064...\r\n      Bob: C1=1914921642414444...  C2=5612938598948334...\r\n      elapsed: 14ms\r\n\r\n[4/5] Verifying ZK proofs (Chaum-Pedersen)...\r\n"]
+[3.310908, "o", "      OK  Alice: sum=10  proof=VALID  (1.504ms)\r\n      OK  Bob: sum=5  proof=VALID  (1.433ms)\r\n      elapsed: 22ms\r\n\r\n[5/5] Recomputing homomorphic sum from raw ballots...\r\n"]
+[3.350521, "o", "      OK  computed ciphertext matches on-chain tally\r\n      elapsed: 41ms\r\n\r\n"]
+[3.350596, "o", "Total elapsed: 96ms\r\n\r\n=== VERIFIED ===\r\nNo secret key. No trusted party. Just public ledger data + ZK proofs.\r\n"]
+[7.37158, "o", "\r\nAnyone with the ledger can reproduce this verification.\r\n"]
